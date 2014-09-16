@@ -53,8 +53,8 @@ class MessageBag
     #get the messages that have been read in the last 30 seconds
     puts @@visible_time
     message_inflight_ids = bag.get_index( 'inflight_int', (Time.now.to_i - @@visible_time)..Time.now.to_i)
-    #get 10 messages
-    message_ids  = bag.get_index( 'id_bin', '0'..'z', max_result: 10)
+    #get inflight+1 messages
+    message_ids  = bag.get_index( 'id_bin', '0'..'z', max_results: (message_inflight_ids.count()+1))
     #remove any messages that are inflight
     message_ids  = message_ids - message_inflight_ids
 
@@ -85,7 +85,10 @@ class MessageBag
     bag = riak.bucket(bag_name)
 
     #get the messages visible
-    message_ids  = bag.get_index( 'id_bin', '0'..'z', max_result: 100000)
+    begin_time = Time.now
+    message_ids  = bag.get_index( 'id_bin', '0'..'z')
+    end_time   = Time.now
+    puts end_time - begin_time
     visible_count = message_ids.count()
     status['visible'] = visible_count
     #get the messages inflight
