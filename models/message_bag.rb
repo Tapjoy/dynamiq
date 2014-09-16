@@ -85,10 +85,7 @@ class MessageBag
     bag = riak.bucket(bag_name)
 
     #get the messages visible
-    begin_time = Time.now
     message_ids  = bag.get_index( 'id_bin', '0'..'z')
-    end_time   = Time.now
-    puts end_time - begin_time
     visible_count = message_ids.count()
     status['visible'] = visible_count
     #get the messages inflight
