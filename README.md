@@ -22,6 +22,7 @@ GET) O(log n )*
 DELETE) O(1)
 
 *  assumes append only insert into store 2, should the insert not be append only enque will become O(log n )
+
 ** where n is based on the total number of objects in the store
 
 Batching
