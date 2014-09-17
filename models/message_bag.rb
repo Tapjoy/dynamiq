@@ -4,22 +4,17 @@ require 'uuid'
 class MessageBag
   @@visible_time = 30
   @@host         = '127.0.0.1'
-
-  def new()
+  def initialize()
 
     # doesn't work need to find mechanism of persisting clients across sinatra instances
-    riak = Riak::Client.new(:nodes =>[
+    @riak = Riak::Client.new(:nodes =>[
       {:@host => @@host }
     ])
-    return self
   end
 
   def put(bag_name, message)
-    riak = Riak::Client.new(:nodes =>[
-      {:@host => @@host }
-    ])
     #create a bag object
-    bag = riak.bucket(bag_name)
+    bag = @riak.bucket(bag_name)
     #create a uuid
     uuid = UUID.new
     message_id = uuid.generate
@@ -34,22 +29,16 @@ class MessageBag
   end
 
   def delete(bag_name, id)
-    riak = Riak::Client.new(:nodes =>[
-      {:@host => @@host }
-    ])
     #get the bag
-    bag = riak.bucket(bag_name)
+    bag = @riak.bucket(bag_name)
   
     #delete the message
     bag.delete(id)
   end
   
   def get(bag_name)
-    riak = Riak::Client.new(:nodes =>[
-      {:@host => @@host }
-    ])
     #get the bag
-    bag = riak.bucket(bag_name)
+    bag = @riak.bucket(bag_name)
     #get the messages that have been read in the last 30 seconds
     puts @@visible_time
     message_inflight_ids = bag.get_index( 'inflight_int', (Time.now.to_i - @@visible_time)..Time.now.to_i)
@@ -76,13 +65,10 @@ class MessageBag
   end
 
   def status(bag_name)
-    riak = Riak::Client.new(:nodes =>[
-      {:@host => @@host }
-    ])
     #initialize the status hash
     status = {}
     #get the queue
-    bag = riak.bucket(bag_name)
+    bag = @riak.bucket(bag_name)
 
     #get the messages visible
     message_ids  = bag.get_index( 'id_bin', '0'..'z')

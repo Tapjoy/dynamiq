@@ -1,6 +1,9 @@
 require 'json'
 require './models/message_bag.rb'
 
+#initialize my connection
+BagManager = MessageBag.new()
+
 class Hydra < Sinatra::Base
 
   get '/' do
@@ -9,14 +12,14 @@ class Hydra < Sinatra::Base
   end
 
   get '/:queue/status' do
-    status = @@bag_manager.status(params[:queue])
+    status = BagManager.status(params[:queue])
     content_type :json
     status.to_json
   end
     
   get '/:queue/message' do
     # return a message from the queue
-    message = @@bag_manager.get(params[:queue])
+    message = BagManager.get(params[:queue])
     if message.nil?
       status 204
     else 
@@ -28,21 +31,17 @@ class Hydra < Sinatra::Base
   end
 
   delete '/:queue/message/:message' do
-    @@bag_manager.delete(params[:queue],params[:message])
+    BagManager.delete(params[:queue],params[:message])
     status 204
   end
 
   put '/:queue/message' do
 
     message_body = request.body.read
-    key = @@bag_manager.put(params[:queue], message_body)
+    key = BagManager.put(params[:queue], message_body)
     status 201
     content_type :json
     { :message_id => key }.to_json
-  end
-
-  configure do
-    @@bag_manager = MessageBag.new()
   end
 
 end
