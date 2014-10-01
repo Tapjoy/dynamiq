@@ -1,0 +1,8 @@
+[core]
+ name=test1 #Name of instance
+ port=7001  #port to bind to
+ seedserver="test0" #host to join to seed the cluster
+ seedport=7000
+ httpport=8081
+ ringsize=10000
+ visibility=30
