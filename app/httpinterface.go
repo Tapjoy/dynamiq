@@ -20,7 +20,7 @@ func Initwebserver(list *memberlist.Memberlist, cfg Config) {
 	})
 	m.Get("/fakeQueue", func() string {
 		return_string := ""
-		top, bottom := part.Getpartition(cfg, list)
+		bottom, top := part.Getpartition(cfg, list)
 		return_string = fmt.Sprintf("Top: %s Bottom: %s\n", strconv.Itoa(top), strconv.Itoa(bottom))
 		return return_string
 	})
