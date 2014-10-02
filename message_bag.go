@@ -8,6 +8,7 @@ import (
   "strconv"
   "math/rand"
   "sync"
+  "math"
 )
 
 type MessageBag struct {
@@ -33,13 +34,14 @@ func main() {
         messageBag := NewMessageBag()
         start := time.Now()
         fmt.Println("Starting get ", j)
-        messageBag.Get("test_bucket")   
+        messageBag.Get("test_bucket", 250)
         elapsed := time.Since(start)
         fmt.Printf("Get took %s for %v\n", elapsed, j)
       //}()    
     }            
-  }
-  WriterBenchmark(1000, 100000000, 512)
+  }  
+  WriterBenchmark(4096, 10000000, 512)
+  ReaderBenchmark(250, 1000000, true, 10)
   fmt.Printf("Complete\n")
 }
   
@@ -78,7 +80,49 @@ func WriterWorker(messageChan chan string, termChan chan bool, wg *sync.WaitGrou
   for active == true {
     select {
       case msg := <- messageChan:    
-        _ = messageBag.Put("test_bucket", msg)
+        _ = messageBag.Put("test_bucket_3", msg)
+      case sig := <- termChan:
+        fmt.Println("Close it out", sig)      
+        active = false
+    }
+  }  
+  wg.Done()
+}
+
+
+func ReaderBenchmark(workerCount int, numReads int, processDeletes bool, batchSize uint32) {
+  //Process five messages at a time
+  readSig := make(chan uint32, workerCount)
+  termSig := make(chan bool)
+  var wg sync.WaitGroup
+  for i := 0; i < workerCount; i++ {
+    wg.Add(1)
+    go ReaderWorker(readSig, termSig, processDeletes, &wg)
+  }
+  for i := 0; i < numReads; i++ {
+    fmt.Println("Issuing read request #", i)
+    readSig <- batchSize
+  }
+  for i := 0; i < workerCount; i++ {
+    termSig <- true
+  }
+  wg.Wait()
+}
+
+func ReaderWorker(readSize chan uint32, termChan chan bool, processDeletes bool, wg *sync.WaitGroup) {  
+  messageBag := NewMessageBag()
+  active := true  
+  for active {
+    select {
+      case batchSize := <- readSize:
+        fmt.Println("Beginning read")
+        messages := messageBag.Get("test_bucket_3", batchSize)        
+        fmt.Println("Read complete")
+        if processDeletes {
+          for _, message := range messages {
+            messageBag.Delete("test_bucket_3", message.Key)
+          }
+        }
       case sig := <- termChan:
         fmt.Println("Close it out", sig)      
         active = false
@@ -120,8 +164,8 @@ func (m *MessageBag) Put(bagName string, message string) string {
       //Retrieve a UUID
       rand.Seed(time.Now().UnixNano())
       t := time.Now().UnixNano()
-      randInt := rand.Intn(9999999999999999)
-      uuid := strconv.Itoa(randInt)
+      randInt := rand.Int63n(math.MaxInt64)
+      uuid := strconv.FormatInt(randInt, 10)
 
       messageObj := bucket.NewObject(uuid)
       messageObj.Indexes["id_int"] = []string{uuid}
@@ -147,6 +191,7 @@ func (m *MessageBag) Delete(bagName string, id string) string {
   if err == nil {
     bucket, err := client.NewBucket(bagName)
     if err == nil {
+      fmt.Println("Deleting: ", id)
       bucket.Delete(id)
     }
   }
@@ -178,7 +223,7 @@ func PutConn(conn *riak.Client) {
 }
 
 func (m *MessageBag) GetMulti(bagName string, ids []string) []riak.RObject {
-  var rObjects = make(chan riak.RObject, len(ids))
+  var rObjectArrayChan = make(chan []riak.RObject, len(ids))
   var rKeys = make(chan string, len(ids))
 
   start := time.Now()
@@ -193,16 +238,38 @@ func (m *MessageBag) GetMulti(bagName string, ids []string) []riak.RObject {
       riakKey = <- rKeys
       //fmt.Println("Getting value")
       rObject, _ := bucket.Get(riakKey)
-      //fmt.Println("Returning value")
-      rObjects <- *rObject      
+
+      //Inflight logic
+      t := time.Now().UnixNano()
+      /* If the inflight time has passed */
+      var idxTime int64
+      idxTime = 0
+      if len(rObject.Indexes["inflight_int"]) == 1 {
+        idxTime, _ = strconv.ParseInt(rObject.Indexes["inflight_int"][0], 10, 64)
+      } else {
+        rObject.Indexes = make(map[string][]string)
+      }
+      if idxTime < t + m.visibleTime {
+        rObject.Indexes["inflight_int"] = []string{strconv.FormatInt(t, 10)}
+        rObject.Indexes["id_int"] = []string{rObject.Key}
+        rObject.Store()
+        rObjectArrayChan <- []riak.RObject{*rObject}
+      } else {
+        fmt.Println("Index time doesn't line up")
+        rObjectArrayChan <- []riak.RObject{}
+      }
+
+      //fmt.Println("Returning value")      
     }()
     rKeys <- ids[i]
   }
   returnVals := make([]riak.RObject, 0)
   for i:= 0; i < len(ids); i++ {      
-    var obj = <- rObjects      
-    returnVals = append(returnVals, obj)
-    //fmt.Printf("\nGet Completed %v of %v", i, len(ids) - 1)
+    var rObjectArray = <- rObjectArrayChan
+    //If the key isn't blank, we've got a meaningful object to deal with
+    if len(rObjectArray) == 1 {
+      returnVals = append(returnVals, rObjectArray[0])  
+    }       
   }
   elapsed := time.Since(start)
   fmt.Printf("Get Multi Took %s\n", elapsed)
@@ -234,8 +301,7 @@ func (m *MessageBag) PutMulti(bagName string, riakObjects []riak.RObject) {
   fmt.Printf("\nPut Multi Took %s\n", elapsed)
 }
 
-func (m *MessageBag) Get(bagName string) []riak.RObject {
-  var messages []riak.RObject
+func (m *MessageBag) Get(bagName string, batchSize uint32) []riak.RObject {
   var returnMessages []riak.RObject    
   client := GetConn()    
   defer PutConn(client)
@@ -251,36 +317,17 @@ func (m *MessageBag) Get(bagName string) []riak.RObject {
     if highDec > 1 {
       highDec = 1
     }
-    base :=  baseDec * 9999999999999999
-    max := highDec * 9999999999999999
+    base :=  baseDec * math.MaxInt64
+    max := highDec * math.MaxInt64
     //fmt.Printf("Base: %v & Max: %v\n", base, max)
     start := time.Now()
     //fmt.Println("Retrieving messages")
-    messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.FormatFloat(base, 'f', 0, 32), strconv.FormatFloat(max, 'f', 0, 32), 250, "")
+    messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.FormatFloat(base, 'f', 0, 32), strconv.FormatFloat(max, 'f', 0, 32), batchSize, "")
     //fmt.Println("Message retrieved ", len(messageIds))
     elapsed := time.Since(start)
     fmt.Printf("id_int query took %s and returned %v messages \n", elapsed, len(messageIds))
     if err == nil {          
-      messages = m.GetMulti(bagName, messageIds)
-      for _, message := range messages {
-        t := time.Now().UnixNano()
-        /* If the inflight time has passed */
-        var idxTime int64
-        idxTime = 0
-        if len(message.Indexes["inflight_int"]) == 1 {
-          idxTime, _ = strconv.ParseInt(message.Indexes["inflight_int"][0], 10, 64)
-        } else {
-          message.Indexes = make(map[string][]string)
-        }
-        if idxTime < t - m.visibleTime {
-          message.Indexes["inflight_int"] = []string{strconv.FormatInt(t, 10)}
-          message.Indexes["id_int"] = []string{message.Key}
-          returnMessages = append(returnMessages, message)            
-        } else {
-          // NOOP
-        }
-      }
-      m.PutMulti(bagName, returnMessages)
+      returnMessages = m.GetMulti(bagName, messageIds)      
     } else {
       fmt.Printf("Error%v", err)
     }
