@@ -7,9 +7,9 @@ import "fmt"
 import "github.com/hashicorp/memberlist"
 import "net/http"
 
-func Initwebserver(list *memberlist.Memberlist, cfg Config) {
+func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 	//test partition
-	part := Initpartitions()
+	part := InitPartitions()
 	m := martini.Classic()
 	m.Get("/servers", func() string {
 		return_string := ""
@@ -20,9 +20,9 @@ func Initwebserver(list *memberlist.Memberlist, cfg Config) {
 	})
 	m.Get("/fakeQueue", func() string {
 		return_string := ""
-		bottom, top := part.Getpartition(cfg, list)
+		bottom, top := part.GetPartition(cfg, list)
 		return_string = fmt.Sprintf("Top: %s Bottom: %s\n", strconv.Itoa(top), strconv.Itoa(bottom))
 		return return_string
 	})
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.Httpport), m))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
 }

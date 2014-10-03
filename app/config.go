@@ -7,10 +7,10 @@ type Config struct {
 	Core struct {
 		Name       string
 		Port       int
-		Seedserver string
-		Seedport   int
-		Httpport   int
-		Ringsize   int
+		SeedServer string
+		SeedPort   int
+		HttpPort   int
+		RingSize   int
 		Visibility float64
 	}
 }

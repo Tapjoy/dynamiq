@@ -15,7 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	list := app.Initmember(cfg)
+	list := app.InitMember(cfg)
 
-	app.Initwebserver(list, cfg)
+	app.InitWebserver(list, cfg)
 }
