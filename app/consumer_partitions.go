@@ -1,11 +1,14 @@
 package app
 
-import "log"
-import "github.com/hashicorp/memberlist"
-import "strconv"
-import "time"
-import "sort"
-import "sync"
+import (
+	"github.com/hashicorp/memberlist"
+	"log"
+	"math"
+	"sort"
+	"strconv"
+	"sync"
+	"time"
+)
 
 type Partitions struct {
 	partitions map[int]time.Time
@@ -29,7 +32,7 @@ func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (in
 	log.Println("Node count: " + strconv.Itoa(nodeCount))
 
 	//calculate the range that our node is responsible for
-	step := cfg.Core.RingSize / nodeCount
+	step := math.MaxInt64 / nodeCount
 	nodeBottom := nodePosition * step
 	nodeTop := (nodePosition + 1) * step
 	log.Println("Node Bottom: " + strconv.Itoa(nodeBottom))

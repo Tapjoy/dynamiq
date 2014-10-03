@@ -1,8 +1,10 @@
 package main
 
-import "log"
-import "flag"
-import "./app/."
+import (
+	"./app/."
+	"flag"
+	"log"
+)
 
 func main() {
 	//Get some Command line options

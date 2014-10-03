@@ -1,31 +1,50 @@
 package app
 
-import "github.com/go-martini/martini"
-import "log"
-import "strconv"
-import "fmt"
-import "github.com/hashicorp/memberlist"
-import "net/http"
+import (
+	"fmt"
+	"github.com/go-martini/martini"
+	"github.com/hashicorp/memberlist"
+	"github.com/martini-contrib/render"
+	//"github.com/tpjg/goriakpbc"
+	"log"
+	"net/http"
+	"strconv"
+)
 
 func InitWebserver(list *memberlist.Memberlist, cfg Config) {
+	// tieing our Queue to HTTP interface == bad we should move this somewhere else
+	queues := InitQueues()
 	//test partition
-	part := InitPartitions()
 	m := martini.Classic()
-	m.Get("/servers", func() string {
+	m.Get("/status/servers", func() string {
 		return_string := ""
 		for _, member := range list.Members() {
 			return_string += fmt.Sprintf("Member: %s %s\n", member.Name, member.Addr)
 		}
 		return return_string
 	})
-	m.Get("/fakeQueue", func() string {
-		return_string := ""
-		bottom, top := part.GetPartition(cfg, list)
-		return_string = fmt.Sprintf("Top: %s Bottom: %s\n", strconv.Itoa(top), strconv.Itoa(bottom))
-		return return_string
-	})
-	m.Get("/queues/:queue/message", func(params martini.Params) string {
-		return "I should be a message from queue " + params["queue"]
+	m.Get("/queues/:queue/messages/:batchSize", func(r render.Render, params martini.Params) {
+		//check if we've initialized this queue yet
+		var present bool
+		_, present = queues.QueueMap[params["queue"]]
+		if present != true {
+			queues.InitQueue(params["queue"])
+		}
+		batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
+		if err != nil {
+			//log the error for unparsable input
+			log.Println(err)
+			r.JSON(422, err.Error())
+		}
+		messages := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
+		//TODO move this into the Queue.Get code
+		var message_map map[string]interface{}
+		for _, object := range messages {
+			//get the number of bytes in the data array
+			message_map[object.Key] = string(object.Data[:])
+		}
+		r.JSON(200, message_map)
+
 	})
 	m.Put("/queues/:queue/message", func(params martini.Params) string {
 		return "I should be the message id that you just put"

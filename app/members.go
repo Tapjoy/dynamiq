@@ -1,8 +1,10 @@
 package app
 
-import "log"
-import "github.com/hashicorp/memberlist"
-import "strconv"
+import (
+	"github.com/hashicorp/memberlist"
+	"log"
+	"strconv"
+)
 
 func InitMember(cfg Config) *memberlist.Memberlist {
 	memberConf := memberlist.DefaultLANConfig()
