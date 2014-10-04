@@ -6,10 +6,13 @@ import (
 	"github.com/hashicorp/memberlist"
 	"github.com/martini-contrib/render"
 	//"github.com/tpjg/goriakpbc"
+	"bytes"
 	"log"
 	"net/http"
 	"strconv"
 )
+
+//TODO make message definitions more explicit
 
 func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
@@ -53,12 +56,21 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		if present != true {
 			queues.InitQueue(params["queue"])
 		}
-		uuid := queues.QueueMap[params["queue"]].Put("test")
+
+		// parse the request body into a sting
+		// TODO clean this up, full json api?
+		var buf bytes.Buffer
+		buf.ReadFrom(req.Body)
+		uuid := queues.QueueMap[params["queue"]].Put(buf.String())
 
 		return uuid
 	})
-	m.Delete("/queues/:queue/message/:messageId", func(params martini.Params) string {
-		return "I should be returning 201 no content, or throw an error"
+	m.Delete("/queues/:queue/message/:messageId", func(params martini.Params) {
+		var present bool
+		_, present = queues.QueueMap[params["queue"]]
+		if present != true {
+			queues.InitQueue(params["queue"])
+		}
 	})
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
 }
