@@ -103,6 +103,9 @@ func (queue Queue) Delete(id string) bool {
 			return true
 		}
 	}
+	if err != nil {
+		log.Println(err)
+	}
 	// if we got here we're borked
 	return false
 }

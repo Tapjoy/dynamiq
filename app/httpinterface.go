@@ -65,12 +65,13 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 
 		return uuid
 	})
-	m.Delete("/queues/:queue/message/:messageId", func(params martini.Params) {
+	m.Delete("/queues/:queue/message/:messageId", func(params martini.Params) bool {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
 			queues.InitQueue(params["queue"])
 		}
+		return queues.QueueMap[params["queue"]].Delete(params["messageId"])
 	})
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
 }
