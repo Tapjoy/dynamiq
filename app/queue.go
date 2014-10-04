@@ -177,7 +177,7 @@ func PutConn(conn *riak.Client) {
 //todo add this to the config file
 func NewClient() (*riak.Client, string) {
 	rand.Seed(time.Now().UnixNano())
-	hosts := []string{"localhost:8087"}
+	hosts := []string{"127.0.0.1:8087"}
 	host := hosts[rand.Intn(len(hosts))]
 	client := riak.NewClient(host)
 	client.SetConnectTimeout(2 * time.Second)

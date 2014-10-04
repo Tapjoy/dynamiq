@@ -16,6 +16,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 	queues := InitQueues()
 	//test partition
 	m := martini.Classic()
+	m.Use(render.Renderer())
 	m.Get("/status/servers", func() string {
 		return_string := ""
 		for _, member := range list.Members() {
@@ -38,7 +39,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		}
 		messages := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
 		//TODO move this into the Queue.Get code
-		var message_map map[string]interface{}
+		message_map := make(map[string]interface{})
 		for _, object := range messages {
 			//get the number of bytes in the data array
 			message_map[object.Key] = string(object.Data[:])
@@ -46,8 +47,15 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		r.JSON(200, message_map)
 
 	})
-	m.Put("/queues/:queue/message", func(params martini.Params) string {
-		return "I should be the message id that you just put"
+	m.Put("/queues/:queue/messages", func(params martini.Params, req *http.Request) string {
+		var present bool
+		_, present = queues.QueueMap[params["queue"]]
+		if present != true {
+			queues.InitQueue(params["queue"])
+		}
+		uuid := queues.QueueMap[params["queue"]].Put("test")
+
+		return uuid
 	})
 	m.Delete("/queues/:queue/message/:messageId", func(params martini.Params) string {
 		return "I should be returning 201 no content, or throw an error"
