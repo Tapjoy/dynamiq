@@ -40,6 +40,7 @@ func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (in
 	//iterate over the partitions and then increase or decrease the number of partitions
 	//start sync
 
+	//TODO move loging out of the sync operation for better throughput
 	part.Lock()
 	myPartition := -1
 	occupiedPartitions := 0
