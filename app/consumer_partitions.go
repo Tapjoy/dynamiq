@@ -37,39 +37,7 @@ func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (in
 	nodeTop := (nodePosition + 1) * step
 	log.Println("Node Bottom: " + strconv.Itoa(nodeBottom))
 	log.Println("Node Top: " + strconv.Itoa(nodeTop))
-	//iterate over the partitions and then increase or decrease the number of partitions
-	//start sync
-
-	//TODO move loging out of the sync operation for better throughput
-	part.Lock()
-	myPartition := -1
-	occupiedPartitions := 0
-	totalPartitions := len(part.partitions)
-	for partition := range part.partitions {
-		//use visibility timeout of 30 seconds
-		log.Println("partition: " + strconv.Itoa(partition) + "occupied time: " + strconv.FormatFloat(time.Since(part.partitions[partition]).Seconds(), 'f', -1, 64))
-		if time.Since(part.partitions[partition]).Seconds() > cfg.Core.Visibility {
-			if myPartition == -1 {
-				myPartition = partition
-				part.partitions[partition] = time.Now()
-
-			}
-		} else {
-			occupiedPartitions = occupiedPartitions + 1
-		}
-	}
-	//if I haven't found an unoccupied partition add one
-	if myPartition == -1 {
-		new_partition := totalPartitions
-		totalPartitions = totalPartitions + 1
-		occupiedPartitions = occupiedPartitions + 1
-		part.partitions[new_partition] = time.Now()
-		myPartition = new_partition
-	}
-	//end sync
-	part.Unlock()
-	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
-	log.Println("occupiedPartitions:" + strconv.Itoa(occupiedPartitions))
+	myPartition, totalPartitions := part.getPartitionPosition(cfg)
 
 	// calculate my range for the given number
 	node_range := nodeTop - nodeBottom
@@ -101,4 +69,39 @@ func getNodePosition(list *memberlist.Memberlist) (int, int) {
 	nodePosition := sort.SearchStrings(nodeNames, list.LocalNode().Name)
 	nodeCount := len(nodeNames)
 	return nodePosition, nodeCount
+}
+func (part Partitions) getPartitionPosition(cfg Config) (int, int) {
+	//iterate over the partitions and then increase or decrease the number of partitions
+	//start sync
+
+	//TODO move loging out of the sync operation for better throughput
+	part.Lock()
+	defer part.Unlock()
+	myPartition := -1
+	occupiedPartitions := 0
+	totalPartitions := len(part.partitions)
+	for partition := range part.partitions {
+		//use visibility timeout of 30 seconds
+		log.Println("partition: " + strconv.Itoa(partition) + "occupied time: " + strconv.FormatFloat(time.Since(part.partitions[partition]).Seconds(), 'f', -1, 64))
+		if time.Since(part.partitions[partition]).Seconds() > cfg.Core.Visibility {
+			if myPartition == -1 {
+				myPartition = partition
+				part.partitions[partition] = time.Now()
+
+			}
+		} else {
+			occupiedPartitions = occupiedPartitions + 1
+		}
+	}
+	//if I haven't found an unoccupied partition add one
+	if myPartition == -1 {
+		new_partition := totalPartitions
+		totalPartitions = totalPartitions + 1
+		occupiedPartitions = occupiedPartitions + 1
+		part.partitions[new_partition] = time.Now()
+		myPartition = new_partition
+	}
+	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
+	log.Println("occupiedPartitions:" + strconv.Itoa(occupiedPartitions))
+	return myPartition, totalPartitions
 }
