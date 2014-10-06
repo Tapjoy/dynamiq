@@ -13,6 +13,7 @@ type Config struct {
 		SeedPort   int
 		HttpPort   int
 		Visibility float64
+		RingSize   int
 	}
 }
 
