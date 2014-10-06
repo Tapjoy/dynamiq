@@ -66,8 +66,8 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 // Put a Message onto the queue
 func (queue Queue) Put(cfg Config, message string) string {
 	//Grab our bucket
-	client := GetConn()
-	defer PutConn(client)
+	client := GetConn(cfg)
+	defer PutConn(client, cfg)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
 		//Retrieve a UUID
@@ -88,8 +88,8 @@ func (queue Queue) Put(cfg Config, message string) string {
 
 // Delete a Message from the queue
 func (queue Queue) Delete(cfg Config, id string) bool {
-	client := GetConn()
-	defer PutConn(client)
+	client := GetConn(cfg)
+	defer PutConn(client, cfg)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
 		log.Println("Deleting: ", id)
