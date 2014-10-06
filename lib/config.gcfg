@@ -7,3 +7,6 @@
  visibility=30
  riaknodes="127.0.0.1:8087"
  backendconnectionpool=16
+ initpartitions=10
+ maxpartitions=50
+ partitionstep=10

@@ -31,19 +31,22 @@ func InitQueues() Queues {
 	return queues
 }
 
-func (queues Queues) InitQueue(name string) {
+func (queues Queues) InitQueue(cfg Config, name string) {
 	queues.QueueMap[name] = Queue{
 		Name:  name,
-		Parts: InitPartitions(),
+		Parts: InitPartitions(cfg),
 		//	RiakPool: make(chan *riak.Client, 4096)
 	}
 }
 
 // get a message from the queue
-func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32) []riak.RObject {
+func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions
-	partBottom, partTop := queue.Parts.GetPartition(cfg, list)
+	partBottom, partTop, err := queue.Parts.GetPartition(cfg, list)
 
+	if err != nil {
+		return nil, err
+	}
 	// grab a riak client
 	client := GetConn(cfg)
 	defer PutConn(client, cfg)
@@ -60,7 +63,7 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 		log.Printf("Error%v", err)
 	}
 	log.Println("Message retrieved ", len(messageIds))
-	return queue.RetrieveMessages(messageIds, cfg)
+	return queue.RetrieveMessages(messageIds, cfg), err
 }
 
 // Put a Message onto the queue

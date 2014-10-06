@@ -15,6 +15,9 @@ type Config struct {
 		Visibility            float64
 		RiakNodes             string
 		BackendConnectionPool int
+		InitPartitions        int
+		MaxPartitions         int
+		PartitionStep         int
 	}
 }
 
