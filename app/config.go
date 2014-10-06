@@ -7,13 +7,14 @@ import (
 
 type Config struct {
 	Core struct {
-		Name       string
-		Port       int
-		SeedServer string
-		SeedPort   int
-		HttpPort   int
-		Visibility float64
-		RingSize   int
+		Name                  string
+		Port                  int
+		SeedServer            string
+		SeedPort              int
+		HttpPort              int
+		Visibility            float64
+		RiakNodes             string
+		BackendConnectionPool int
 	}
 }
 

@@ -1,8 +1,9 @@
 [core]
- name = test1 #Name of instance
- port = 7001  #port to bind to
- seedserver = "test0" #host to join to seed the cluster
- seedport = 7000
- httpport = 8081
- ringsize = 128
- visibility = 30
+ name=test1 #Name of instance
+ port=7001  #port to bind to
+ seedserver="test0" #host to join to seed the cluster
+ seedport=7000
+ httpport=8081
+ visibility=30
+ riaknodes="127.0.0.1:8087"
+ backendconnectionpool=16
