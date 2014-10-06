@@ -4,5 +4,4 @@
  seedserver="test0" #host to join to seed the cluster
  seedport=7000
  httpport=8081
- ringsize=10000
  visibility=30
