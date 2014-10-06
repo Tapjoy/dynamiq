@@ -67,44 +67,37 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 }
 
 // Put a Message onto the queue
-// TO DO remove the message instantiation from the httpinterface
 func (queue Queue) Put(cfg Config, message string) string {
 	//Grab our bucket
 	client := GetConn(cfg)
 	defer PutConn(client, cfg)
-	err := client.Connect()
+	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
-		bucket, err := client.NewBucket(queue.Name)
-		if err == nil {
-			//Retrieve a UUID
-			rand.Seed(time.Now().UnixNano())
-			randInt := rand.Int63n(math.MaxInt64)
-			uuid := strconv.FormatInt(randInt, 10)
+		//Retrieve a UUID
+		rand.Seed(time.Now().UnixNano())
+		randInt := rand.Int63n(math.MaxInt64)
+		uuid := strconv.FormatInt(randInt, 10)
 
-			messageObj := bucket.NewObject(uuid)
-			messageObj.Indexes["id_int"] = []string{uuid}
-			messageObj.Data = []byte(message)
-			messageObj.Store()
-			return uuid
-		}
+		messageObj := bucket.NewObject(uuid)
+		messageObj.Indexes["id_int"] = []string{uuid}
+		messageObj.Data = []byte(message)
+		messageObj.Store()
+		return uuid
+	} else {
+		//Actually want to handle this in some other way
+		return ""
 	}
-	// We do not handle errors, these should either be logged, or returned to the client
-	// TODO should through an error if we get here
-	return ""
 }
 
 // Delete a Message from the queue
 func (queue Queue) Delete(cfg Config, id string) bool {
 	client := GetConn(cfg)
 	defer PutConn(client, cfg)
-	err := client.Connect()
+	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
-		bucket, err := client.NewBucket(queue.Name)
-		if err == nil {
-			log.Println("Deleting: ", id)
-			bucket.Delete(id)
-			return true
-		}
+		log.Println("Deleting: ", id)
+		bucket.Delete(id)
+		return true
 	}
 	if err != nil {
 		log.Println(err)
