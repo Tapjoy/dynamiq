@@ -61,7 +61,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		// TODO clean this up, full json api?
 		var buf bytes.Buffer
 		buf.ReadFrom(req.Body)
-		uuid := queues.QueueMap[params["queue"]].Put(buf.String())
+		uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String())
 
 		return uuid
 	})
@@ -71,7 +71,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		if present != true {
 			queues.InitQueue(params["queue"])
 		}
-		return queues.QueueMap[params["queue"]].Delete(params["messageId"])
+		return queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"])
 	})
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
 }

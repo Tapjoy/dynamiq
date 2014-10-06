@@ -5,3 +5,5 @@
  seedport=7000
  httpport=8081
  visibility=30
+ riaknodes="127.0.0.1:8087"
+ backendconnectionpool=16
