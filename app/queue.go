@@ -35,7 +35,7 @@ func (queues Queues) InitQueue(cfg Config, name string) {
 	queues.QueueMap[name] = Queue{
 		Name:  name,
 		Parts: InitPartitions(cfg),
-		//	RiakPool: make(chan *riak.Client, 4096)
+		//  RiakPool: make(chan *riak.Client, 4096)
 	}
 }
 
