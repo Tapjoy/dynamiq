@@ -25,23 +25,8 @@ func InitPartitions(cfg Config) Partitions {
 	return part
 }
 
-func (part Partitions) makePartitions(cfg Config, partitionsToMake int) error {
-	offset := len(part.partitions)
-	var initialTime time.Time
-	partitionsMade := 0
-	for partition := offset; partition < offset+partitionsToMake; partition++ {
-		if cfg.Core.MaxPartitions > partition {
-			part.partitions[partition] = initialTime
-			partitionsMade = partitionsMade + 1
-		}
-	}
-	log.Println("tried to make " + strconv.Itoa(partitionsToMake))
-	log.Println("made " + strconv.Itoa(partitionsMade))
-	if partitionsMade != partitionsToMake {
-		return errors.New("no available partitions")
-	}
-	return nil
-
+func (part Partitions) PartitionCount() int {
+	return len(part.partitions)
 }
 
 func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (int, int, error) {
@@ -131,4 +116,23 @@ func (part Partitions) getPartitionPosition(cfg Config) (int, int, error) {
 	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
 	log.Println("occupiedPartitions:" + strconv.Itoa(occupiedPartitions))
 	return myPartition, totalPartitions, err
+}
+
+func (part Partitions) makePartitions(cfg Config, partitionsToMake int) error {
+	offset := len(part.partitions)
+	var initialTime time.Time
+	partitionsMade := 0
+	for partition := offset; partition < offset+partitionsToMake; partition++ {
+		if cfg.Core.MaxPartitions > partition {
+			part.partitions[partition] = initialTime
+			partitionsMade = partitionsMade + 1
+		}
+	}
+	log.Println("tried to make " + strconv.Itoa(partitionsToMake))
+	log.Println("made " + strconv.Itoa(partitionsMade))
+	if partitionsMade != partitionsToMake {
+		return errors.New("no available partitions")
+	}
+	return nil
+
 }
