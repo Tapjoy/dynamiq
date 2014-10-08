@@ -8,7 +8,7 @@ type topic struct {
 }
 type topics struct {
 	// global topic configuration, should contain list of all active topics
-	Config riak.RDtMap
+	Config *riak.RDtMap
 	// topic map
 	TopicMap *[string]topic
 }

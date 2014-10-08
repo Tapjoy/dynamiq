@@ -16,9 +16,9 @@ type Queues struct {
 	//container for all objects
 	//should contain list of queues + global configuration parameters
 	// Uses CRDTS :)
-	config riak.RObject
+	config *riak.RDtMap
 	//container for global stats about all queues
-	Stats riak.RObject
+	Stats *riak.RDtMap
 }
 type Queue struct {
 	// the definition of a queue
@@ -27,9 +27,9 @@ type Queue struct {
 	// the partitions of the queue
 	Parts Partitions
 	// statistics about a particular queue
-	Stats riak.RObject
+	Stats *riak.RDtMap
 	// configuration of the queue
-	Config riak.RObject
+	Config *riak.RDtMap
 }
 
 //lazy load the queues
