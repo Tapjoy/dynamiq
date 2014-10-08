@@ -1,31 +1,31 @@
 package app
 
 import (
-	"code.google.com/p/gcfg"
-	"log"
+  "code.google.com/p/gcfg"
+  "log"
 )
 
 type Config struct {
-	Core struct {
-		Name                  string
-		Port                  int
-		SeedServer            string
-		SeedPort              int
-		HttpPort              int
-		Visibility            float64
-		RiakNodes             string
-		BackendConnectionPool int
-		InitPartitions        int
-		MaxPartitions         int
-		PartitionStep         int
-	}
+  Core struct {
+    Name                  string
+    Port                  int
+    SeedServer            string
+    SeedPort              int
+    HttpPort              int
+    Visibility            float64
+    RiakNodes             string
+    BackendConnectionPool int
+    InitPartitions        int
+    MaxPartitions         int
+    PartitionStep         int
+  }
 }
 
 func Getconfig(config_file *string) (Config, error) {
-	var cfg Config
-	err := gcfg.ReadFileInto(&cfg, *config_file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return cfg, err
+  var cfg Config
+  err := gcfg.ReadFileInto(&cfg, *config_file)
+  if err != nil {
+    log.Fatal(err)
+  }
+  return cfg, err
 }
