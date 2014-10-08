@@ -12,36 +12,27 @@ import (
 )
 
 type Partitions struct {
-	partitions map[int]time.Time
+	partitions map[int]*Partition
+	sync.Mutex
+}
+
+type Partition struct {
+	Id       int
+	LastUsed time.Time
 	sync.Mutex
 }
 
 func InitPartitions(cfg Config) Partitions {
 	part := Partitions{
-		partitions: make(map[int]time.Time),
+		partitions: make(map[int]*Partition),
 	}
 	//make sure there is an element in the array
 	part.makePartitions(cfg, cfg.Core.InitPartitions)
 	return part
 }
 
-func (part Partitions) makePartitions(cfg Config, partitionsToMake int) error {
-	offset := len(part.partitions)
-	var initialTime time.Time
-	partitionsMade := 0
-	for partition := offset; partition < offset+partitionsToMake; partition++ {
-		if cfg.Core.MaxPartitions > partition {
-			part.partitions[partition] = initialTime
-			partitionsMade = partitionsMade + 1
-		}
-	}
-	log.Println("tried to make " + strconv.Itoa(partitionsToMake))
-	log.Println("made " + strconv.Itoa(partitionsMade))
-	if partitionsMade != partitionsToMake {
-		return errors.New("no available partitions")
-	}
-	return nil
-
+func (part Partitions) PartitionCount() int {
+	return len(part.partitions)
 }
 
 func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (int, int, error) {
@@ -95,40 +86,60 @@ func getNodePosition(list *memberlist.Memberlist) (int, int) {
 }
 func (part Partitions) getPartitionPosition(cfg Config) (int, int, error) {
 	//iterate over the partitions and then increase or decrease the number of partitions
-	//start sync
 
 	//TODO move loging out of the sync operation for better throughput
-	part.Lock()
 	myPartition := -1
 	occupiedPartitions := 0
 	totalPartitions := len(part.partitions)
 	var err error
-	for partition := range part.partitions {
+	for partitionId := range part.partitions {
 		//use visibility timeout of 30 seconds
-		log.Println("partition: " + strconv.Itoa(partition) + "occupied time: " + strconv.FormatFloat(time.Since(part.partitions[partition]).Seconds(), 'f', -1, 64))
-		if time.Since(part.partitions[partition]).Seconds() > cfg.Core.Visibility {
+		log.Println("partition: " + strconv.Itoa(partitionId) + "occupied time: " + strconv.FormatFloat(time.Since(part.partitions[partitionId].LastUsed).Seconds(), 'f', -1, 64))
+		part.partitions[partitionId].Lock()
+		if time.Since(part.partitions[partitionId].LastUsed).Seconds() > cfg.Core.Visibility {
 			if myPartition == -1 {
-				myPartition = partition
-				part.partitions[partition] = time.Now()
+				myPartition = partitionId
+				part.partitions[partitionId].LastUsed = time.Now()
 
 			}
 		} else {
 			occupiedPartitions = occupiedPartitions + 1
 		}
+		part.partitions[partitionId].Unlock()
 	}
 	//if I haven't found an unoccupied partition create more
 	if myPartition == -1 {
 
 		err = part.makePartitions(cfg, cfg.Core.PartitionStep)
 		if err == nil {
-			part.Unlock()
 			myPartition, totalPartitions, err = part.getPartitionPosition(cfg)
-		} else {
-			part.Unlock()
 		}
-
 	}
 	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
 	log.Println("occupiedPartitions:" + strconv.Itoa(occupiedPartitions))
 	return myPartition, totalPartitions, err
+}
+
+func (part Partitions) makePartitions(cfg Config, partitionsToMake int) error {
+	part.Lock()
+	defer part.Unlock()
+	offset := len(part.partitions)
+	var initialTime time.Time
+	partitionsMade := 0
+	for partitionId := offset; partitionId < offset+partitionsToMake; partitionId++ {
+		if cfg.Core.MaxPartitions > partitionId {
+			partition := new(Partition)
+			partition.Id = partitionId
+			partition.LastUsed = initialTime
+			part.partitions[partitionId] = partition
+			partitionsMade = partitionsMade + 1
+		}
+	}
+	log.Println("tried to make " + strconv.Itoa(partitionsToMake))
+	log.Println("made " + strconv.Itoa(partitionsMade))
+	if partitionsMade != partitionsToMake {
+		return errors.New("no available partitions")
+	}
+	return nil
+
 }
