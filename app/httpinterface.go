@@ -17,7 +17,8 @@ import (
 func InitWebserver(list *memberlist.Memberlist, cfg Config) {
   // tieing our Queue to HTTP interface == bad we should move this somewhere else
   queues := InitQueues()
-  //test partition
+  //init the connectionPool
+  riakPool := InitRiakPool(cfg)
   m := martini.Classic()
   m.Use(render.Renderer())
   m.Get("/status/servers", func() string {
@@ -51,7 +52,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
       log.Println(err)
       r.JSON(422, err.Error())
     }
-    messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
+    messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize), riakPool)
     //TODO move this into the Queue.Get code
     message_map := make(map[string]interface{})
     for _, object := range messages {
@@ -77,7 +78,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
     // TODO clean this up, full json api?
     var buf bytes.Buffer
     buf.ReadFrom(req.Body)
-    uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String())
+    uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String(), riakPool)
 
     return uuid
   })
@@ -87,7 +88,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
     if present != true {
       queues.InitQueue(cfg, params["queue"])
     }
-    return queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"])
+    return queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"], riakPool)
   })
   log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
 }
