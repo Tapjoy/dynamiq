@@ -36,6 +36,8 @@ type Queue struct {
 func InitQueues() Queues {
 	queues := Queues{
 		QueueMap: make(map[string]Queue),
+		config:   riak.RObject, // need to sort this out?
+		Stats:    riak.RObject,
 	}
 	return queues
 }
@@ -44,7 +46,6 @@ func (queues Queues) InitQueue(cfg Config, name string) {
 	queues.QueueMap[name] = Queue{
 		Name:  name,
 		Parts: InitPartitions(cfg),
-		//  RiakPool: make(chan *riak.Client, 4096)
 	}
 }
 
