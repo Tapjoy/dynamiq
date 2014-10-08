@@ -2,6 +2,9 @@ package app
 
 import (
 	"github.com/tpjg/goriakpbc"
+	"log"
+	"math/rand"
+	"time"
 )
 
 //define a pool
@@ -9,12 +12,12 @@ import (
 type RiakPool chan *riak.Client
 
 func InitRiakPool(cfg Config) RiakPool {
-	riakPool := RiakPool{make(chan *riak.Client, cfg.Core.BackendConnectionPool)}
+	var riakPool RiakPool = make(chan *riak.Client, cfg.Core.BackendConnectionPool)
 	for i := 0; i < cfg.Core.BackendConnectionPool; i++ {
 		log.Println("Initializing client pool ", i)
-		client, _ := NewClient()
+		client, _ := riakPool.NewClient(cfg)
 		client.Ping()
-		PutConn(client)
+		riakPool.PutConn(client)
 	}
 
 	return riakPool
@@ -33,7 +36,7 @@ func (riakPool RiakPool) PutConn(conn *riak.Client) {
 }
 
 //todo add this to the config file
-func (riakPool RiakPool) NewClient() (*riak.Client, string) {
+func (riakPool RiakPool) NewClient(cfg Config) (*riak.Client, string) {
 	rand.Seed(time.Now().UnixNano())
 	hosts := []string{cfg.Core.RiakNodes}
 	host := hosts[rand.Intn(len(hosts))]
@@ -42,7 +45,7 @@ func (riakPool RiakPool) NewClient() (*riak.Client, string) {
 	err := client.Connect()
 	if err != nil {
 		log.Println(err.Error())
-		return NewClient(cfg)
+		return riakPool.NewClient(cfg)
 	} else {
 		return client, host
 	}

@@ -62,7 +62,7 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 		log.Printf("Error%v", err)
 	}
 	log.Println("Message retrieved ", len(messageIds))
-	return queue.RetrieveMessages(messageIds, cfg), err
+	return queue.RetrieveMessages(messageIds, cfg, riakPool), err
 }
 
 // Put a Message onto the queue
@@ -116,7 +116,7 @@ func (queue Queue) RetrieveMessages(ids []string, cfg Config, riakPool RiakPool)
 		go func() {
 			var riakKey string
 			client := riakPool.GetConn()
-			defer riakPool.PutConn(client, cfg)
+			defer riakPool.PutConn(client)
 			//fmt.Println("Getting bucket")
 			bucket, _ := client.NewBucket(queue.Name)
 			riakKey = <-rKeys
