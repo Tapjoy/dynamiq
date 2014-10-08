@@ -16,9 +16,11 @@ type Queues struct {
 	//container for all objects
 	//should contain list of queues + global configuration parameters
 	// Uses CRDTS :)
-	config *riak.RDtMap
+	Config *riak.RDtMap
 	//container for global stats about all queues
 	Stats *riak.RDtMap
+	// connection pool for riak
+	riakPool RiakPool
 }
 type Queue struct {
 	// the definition of a queue
@@ -30,27 +32,33 @@ type Queue struct {
 	Stats *riak.RDtMap
 	// configuration of the queue
 	Config *riak.RDtMap
+	// Riak connection Pool
+	riakPool RiakPool
 }
 
 //lazy load the queues
-func InitQueues() Queues {
+func InitQueues(riakPool RiakPool) Queues {
 	queues := Queues{
 		QueueMap: make(map[string]Queue),
-		config:   riak.RObject, // need to sort this out?
-		Stats:    riak.RObject,
+		Config:   new(riak.RDtMap), // need to sort this out?
+		Stats:    new(riak.RDtMap),
+		riakPool: riakPool,
 	}
 	return queues
 }
 
-func (queues Queues) InitQueue(cfg Config, name string) {
+func (queues Queues) InitQueue(cfg Config, name string, riakPool RiakPool) {
 	queues.QueueMap[name] = Queue{
-		Name:  name,
-		Parts: InitPartitions(cfg),
+		Name:     name,
+		Parts:    InitPartitions(cfg),
+		riakPool: riakPool,
+		Config:   new(riak.RDtMap),
+		Stats:    new(riak.RDtMap),
 	}
 }
 
 // get a message from the queue
-func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32, riakPool RiakPool) ([]riak.RObject, error) {
+func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions
 	partBottom, partTop, err := queue.Parts.GetPartition(cfg, list)
 
@@ -58,8 +66,8 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 		return nil, err
 	}
 	// grab a riak client
-	client := riakPool.GetConn()
-	defer riakPool.PutConn(client)
+	client := queue.riakPool.GetConn()
+	defer queue.riakPool.PutConn(client)
 
 	//set the bucket
 	bucket, err := client.NewBucket(queue.Name)
@@ -73,14 +81,14 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 		log.Printf("Error%v", err)
 	}
 	log.Println("Message retrieved ", len(messageIds))
-	return queue.RetrieveMessages(messageIds, cfg, riakPool), err
+	return queue.RetrieveMessages(messageIds, cfg), err
 }
 
 // Put a Message onto the queue
-func (queue Queue) Put(cfg Config, message string, riakPool RiakPool) string {
+func (queue Queue) Put(cfg Config, message string) string {
 	//Grab our bucket
-	client := riakPool.GetConn()
-	defer riakPool.PutConn(client)
+	client := queue.riakPool.GetConn()
+	defer queue.riakPool.PutConn(client)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
 		//Retrieve a UUID
@@ -100,9 +108,9 @@ func (queue Queue) Put(cfg Config, message string, riakPool RiakPool) string {
 }
 
 // Delete a Message from the queue
-func (queue Queue) Delete(cfg Config, id string, riakPool RiakPool) bool {
-	client := riakPool.GetConn()
-	defer riakPool.PutConn(client)
+func (queue Queue) Delete(cfg Config, id string) bool {
+	client := queue.riakPool.GetConn()
+	defer queue.riakPool.PutConn(client)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
 		log.Println("Deleting: ", id)
@@ -117,7 +125,7 @@ func (queue Queue) Delete(cfg Config, id string, riakPool RiakPool) bool {
 }
 
 // helpers
-func (queue Queue) RetrieveMessages(ids []string, cfg Config, riakPool RiakPool) []riak.RObject {
+func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
 	var rObjectArrayChan = make(chan []riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
@@ -126,8 +134,8 @@ func (queue Queue) RetrieveMessages(ids []string, cfg Config, riakPool RiakPool)
 	for i := 0; i < len(ids); i++ {
 		go func() {
 			var riakKey string
-			client := riakPool.GetConn()
-			defer riakPool.PutConn(client)
+			client := queue.riakPool.GetConn()
+			defer queue.riakPool.PutConn(client)
 			//fmt.Println("Getting bucket")
 			bucket, _ := client.NewBucket(queue.Name)
 			riakKey = <-rKeys
