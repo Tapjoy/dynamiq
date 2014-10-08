@@ -34,7 +34,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
-			queues.InitQueue(cfg, params["queue"], riakPool)
+			queues.InitQueue(cfg, params["queue"])
 		}
 		r.JSON(200, map[string]interface{}{"paritions": queues.QueueMap[params["queue"]].Parts.PartitionCount()})
 	})
@@ -44,7 +44,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
-			queues.InitQueue(cfg, params["queue"], riakPool)
+			queues.InitQueue(cfg, params["queue"])
 		}
 		batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
 		if err != nil {
@@ -71,7 +71,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
-			queues.InitQueue(cfg, params["queue"], riakPool)
+			queues.InitQueue(cfg, params["queue"])
 		}
 
 		// parse the request body into a sting

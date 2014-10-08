@@ -47,11 +47,11 @@ func InitQueues(riakPool RiakPool) Queues {
 	return queues
 }
 
-func (queues Queues) InitQueue(cfg Config, name string, riakPool RiakPool) {
+func (queues Queues) InitQueue(cfg Config, name string) {
 	queues.QueueMap[name] = Queue{
 		Name:     name,
 		Parts:    InitPartitions(cfg),
-		riakPool: riakPool,
+		riakPool: queues.riakPool,
 		Config:   new(riak.RDtMap),
 		Stats:    new(riak.RDtMap),
 	}
