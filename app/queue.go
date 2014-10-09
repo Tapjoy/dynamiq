@@ -14,11 +14,6 @@ type Queues struct {
 	// a container for all queues
 	QueueMap map[string]Queue
 	//container for all objects
-	//should contain list of queues + global configuration parameters
-	// Uses CRDTS :)
-	Config *riak.RDtMap
-	//container for global stats about all queues
-	Stats *riak.RDtMap
 	// connection pool for riak
 	riakPool RiakPool
 }
@@ -28,10 +23,6 @@ type Queue struct {
 	Name string
 	// the partitions of the queue
 	Parts Partitions
-	// statistics about a particular queue
-	Stats *riak.RDtMap
-	// configuration of the queue
-	Config *riak.RDtMap
 	// Riak connection Pool
 	riakPool RiakPool
 }
@@ -40,8 +31,6 @@ type Queue struct {
 func InitQueues(riakPool RiakPool) Queues {
 	queues := Queues{
 		QueueMap: make(map[string]Queue),
-		Config:   new(riak.RDtMap), // need to sort this out?
-		Stats:    new(riak.RDtMap),
 		riakPool: riakPool,
 	}
 	return queues
@@ -52,8 +41,6 @@ func (queues Queues) InitQueue(cfg Config, name string) {
 		Name:     name,
 		Parts:    InitPartitions(cfg),
 		riakPool: queues.riakPool,
-		Config:   new(riak.RDtMap),
-		Stats:    new(riak.RDtMap),
 	}
 }
 
