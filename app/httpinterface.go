@@ -40,6 +40,46 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		}
 		r.JSON(200, map[string]interface{}{"paritions": queues.QueueMap[params["queue"]].Parts.PartitionCount()})
 	})
+	m.Get("/topics", func(r render.Render) {
+		topicList := make([]string, 10)
+		for key, _ := range topics.TopicMap {
+			topicList = append(topicList, key)
+		}
+		r.JSON(200, map[string]interface{}{"topics": topicList})
+	})
+	m.Get("/topics/:topic", func(r render.Render, params martini.Params) {
+		var present bool
+		_, present = topics.TopicMap[params["topic"]]
+		if present != true {
+			topics.InitTopic(params["topic"])
+		}
+
+		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+	})
+
+	m.Put("/topics/:topic", func(r render.Render, params martini.Params, req *http.Request) {
+		var present bool
+		_, present = topics.TopicMap[params["topic"]]
+		if present != true {
+			topics.InitTopic(params["topic"])
+		}
+		var buf bytes.Buffer
+		buf.ReadFrom(req.Body)
+		topics.TopicMap[params["topic"]].AddQueue(buf.String())
+		r.JSON(200, map[string]interface{}{"queue": buf.String()})
+	})
+
+	m.Delete("/topics/:topic", func(r render.Render, params martini.Params, req *http.Request) {
+		var present bool
+		_, present = topics.TopicMap[params["topic"]]
+		if present != true {
+			topics.InitTopic(params["topic"])
+		}
+		var buf bytes.Buffer
+		buf.ReadFrom(req.Body)
+		topics.TopicMap[params["topic"]].DeleteQueue(buf.String())
+		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+	})
 
 	m.Get("/queues/:queue/messages/:batchSize", func(r render.Render, params martini.Params) {
 		//check if we've initialized this queue yet
