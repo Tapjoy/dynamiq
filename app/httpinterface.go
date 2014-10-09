@@ -18,6 +18,8 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 	riakPool := InitRiakPool(cfg)
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	queues := InitQueues(riakPool)
+	// also tieing topics this is next for refactor
+	topics := InitTopics(cfg, riakPool, queues)
 
 	m := martini.Classic()
 	m.Use(render.Renderer())
@@ -86,7 +88,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
-			queues.InitQueue(cfg, params["queue"], riakPool)
+			queues.InitQueue(cfg, params["queue"])
 		}
 		return queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"])
 	})
