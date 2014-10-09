@@ -139,7 +139,7 @@ func (topics Topics) syncConfig(cfg Config) {
 
     //iterate over the topics in riak and add the missing ones
     topicsToKeep := make(map[string]bool)
-    for topic := range topicSlice {
+    for _, topic := range topicSlice {
       var present bool
       _, present = topics.TopicMap[string(topic)]
       if present != true {

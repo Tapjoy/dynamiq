@@ -42,8 +42,8 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
   })
   m.Get("/topics", func(r render.Render) {
     topicList := make([]string, 10)
-    for key, _ := range topics.TopicMap {
-      topicList = append(topicList, key)
+    for topicName, _ := range topics.TopicMap {
+      topicList = append(topicList, topicName)
     }
     r.JSON(200, map[string]interface{}{"topics": topicList})
   })
