@@ -57,19 +57,28 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
 
-	m.Put("/topics/:topic", func(r render.Render, params martini.Params, req *http.Request) {
+	m.Put("/topics/:topic/queues/:queue", func(r render.Render, params martini.Params) {
 		var present bool
 		_, present = topics.TopicMap[params["topic"]]
 		if present != true {
 			topics.InitTopic(params["topic"])
 		}
-		var buf bytes.Buffer
-		buf.ReadFrom(req.Body)
-		topics.TopicMap[params["topic"]].AddQueue(buf.String())
-		r.JSON(200, map[string]interface{}{"queue": buf.String()})
+		topics.TopicMap[params["topic"]].AddQueue(params["queue"])
+		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
 
-	m.Delete("/topics/:topic", func(r render.Render, params martini.Params, req *http.Request) {
+	// neeeds a little work....
+	m.Delete("/topics/:topic/queues/:queue", func(r render.Render, params martini.Params) {
+		var present bool
+		_, present = topics.TopicMap[params["topic"]]
+		if present != true {
+			topics.InitTopic(params["topic"])
+		}
+		topics.TopicMap[params["topic"]].DeleteQueue(params["queue"])
+		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+	})
+	m.Put("/topics/:topic/message", func(r render.Render, params martini.Params, req *http.Request) {
+
 		var present bool
 		_, present = topics.TopicMap[params["topic"]]
 		if present != true {
@@ -77,8 +86,9 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		}
 		var buf bytes.Buffer
 		buf.ReadFrom(req.Body)
-		topics.TopicMap[params["topic"]].DeleteQueue(buf.String())
-		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+
+		response := topics.TopicMap[params["topic"]].Broadcast(cfg, buf.String())
+		r.JSON(200, response)
 	})
 
 	m.Get("/queues/:queue/messages/:batchSize", func(r render.Render, params martini.Params) {

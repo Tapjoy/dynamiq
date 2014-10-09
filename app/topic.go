@@ -26,26 +26,23 @@ type Topics struct {
 func InitTopics(cfg Config, riakPool RiakPool, queues Queues) Topics {
 	client := riakPool.GetConn()
 	defer riakPool.PutConn(client)
-	bucket, _ := client.NewBucketType("maps", "config")
+	bucket, err := client.NewBucketType("maps", "config")
+	if err != nil {
+		log.Println(err)
+	}
 	config, err := bucket.FetchMap("topicsConfig")
 	if err != nil {
 		log.Println(err)
 	}
 	if config.FetchSet("topics") == nil {
-		config.AddSet("topics")
+		topicSet := config.AddSet("topics")
+		//there's a bug in the protobufs client/cant have an empty set
+		topicSet.Add([]byte("default_topic"))
 		err = config.Store()
-		log.Println(err)
 	}
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println("stroring in riak")
-	config.Store()
-	config.Print()
-	log.Println("stored in riak")
-	mapper, err := bucket.FetchMap("topicsConfig")
-	mapper.Print()
-
 	topics := Topics{
 		Config:   config,
 		riakPool: riakPool,
@@ -72,13 +69,16 @@ func (topics Topics) InitTopic(name string) {
 		topics.TopicMap[name].Config.AddSet("queues")
 		topics.TopicMap[name].Config.Store()
 	}
+	// Add the queue to the riak store
+	topics.Config.FetchSet("topics").Add([]byte(name))
+	topics.Config.Store()
 
 }
 
 //Broadcast the message to all listening queues and return the acked writes
-func (topic Topic) BroadCast(cfg Config, message string) map[string]string {
+func (topic Topic) Broadcast(cfg Config, message string) map[string]string {
 	queueWrites := make(map[string]string)
-	for queue := range topic.Config.FetchSet("queues").GetValue() {
+	for _, queue := range topic.Config.FetchSet("queues").GetValue() {
 		//check if we've initialized this queue yet
 		var present bool
 		_, present = topic.queues.QueueMap[string(queue)]
@@ -102,8 +102,8 @@ func (topic Topic) DeleteQueue(name string) {
 }
 
 func (topic Topic) ListQueues() []string {
-	list := make([]string, 15)
-	for queueName := range topic.Config.FetchSet("queues").GetValue() {
+	list := make([]string, 1)
+	for _, queueName := range topic.Config.FetchSet("queues").GetValue() {
 		list = append(list, string(queueName))
 	}
 	return list
@@ -122,13 +122,10 @@ func (topics Topics) syncConfig(cfg Config) {
 		//fetch the map ignore error for event that map doesn't exist
 		//TODO make these keys configurable?
 		//Question is this thread safe...?
-		topics.Config.Print()
 		topics.Config, err = bucket.FetchMap("topicsConfig")
 		if err != nil {
 			log.Println(err)
 		}
-		log.Println("syncing topics")
-		topics.Config.Print()
 		//iterate the map and add or remove topics that need to be destroyed
 		topicSlice := topics.Config.FetchSet("topics").GetValue()
 		if topicSlice == nil {

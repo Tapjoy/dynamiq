@@ -25,14 +25,12 @@ func InitRiakPool(cfg Config) RiakPool {
 
 //Get the a riak connection from the pool
 func (riakPool RiakPool) GetConn() *riak.Client {
-	log.Printf("Conn backlog %v", len(riakPool))
 	conn := <-riakPool
 	return conn
 }
 
 //put a riak connection back on the pool
 func (riakPool RiakPool) PutConn(conn *riak.Client) {
-	log.Printf("Conn backlog %v", len(riakPool))
 	riakPool <- conn
 }
 
