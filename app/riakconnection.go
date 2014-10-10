@@ -31,7 +31,6 @@ func (riakPool RiakPool) GetConn() *riak.Client {
 
 //put a riak connection back on the pool
 func (riakPool RiakPool) PutConn(conn *riak.Client) {
-  log.Printf("Conn backlog %v", len(riakPool))
   riakPool <- conn
 }
 

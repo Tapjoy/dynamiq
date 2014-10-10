@@ -3,6 +3,7 @@ package app
 import (
   "code.google.com/p/gcfg"
   "log"
+  "time"
 )
 
 type Config struct {
@@ -18,6 +19,7 @@ type Config struct {
     InitPartitions        int
     MaxPartitions         int
     PartitionStep         int
+    SyncConfigInterval    time.Duration
   }
 }
 
