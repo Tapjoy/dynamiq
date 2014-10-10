@@ -109,10 +109,30 @@ func (topic Topic) ListQueues() []string {
 	return list
 }
 
+func (topics Topics) DeleteTopic(name string) bool {
+	client := topics.riakPool.GetConn()
+	defer topics.riakPool.PutConn(client)
+	bucket, err := client.NewBucketType("maps", "config")
+	topics.Config, err = bucket.FetchMap("topicsConfig")
+	topics.Config.FetchSet("topics").Remove([]byte(name))
+	err = topics.Config.Store()
+	topics.Config, err = bucket.FetchMap("topicsConfig")
+	err = topics.TopicMap[name].Config.Destroy()
+	err = topics.TopicMap[name].Config.Store()
+	delete(topics.TopicMap, name)
+	if err != nil {
+		log.Println(err)
+		return false
+	} else {
+		return true
+	}
+}
+
 //helpers
 //TODO move error handling for empty config in riak to initializer
 func (topics Topics) syncConfig(cfg Config) {
 	for {
+		log.Println("syncing with Riak")
 		//refresh the topic RDtMap
 		client := topics.riakPool.GetConn()
 		bucket, err := client.NewBucketType("maps", "config")

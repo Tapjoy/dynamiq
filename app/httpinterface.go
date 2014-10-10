@@ -77,6 +77,17 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		topics.TopicMap[params["topic"]].DeleteQueue(params["queue"])
 		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
+
+	m.Delete("/topics/:topic", func(r render.Render, params martini.Params) {
+
+		var present bool
+		_, present = topics.TopicMap[params["topic"]]
+		if present != true {
+			topics.InitTopic(params["topic"])
+		}
+		r.JSON(200, map[string]interface{}{"Deleted": topics.DeleteTopic(params["topic"])})
+	})
+
 	m.Put("/topics/:topic/message", func(r render.Render, params martini.Params, req *http.Request) {
 
 		var present bool
