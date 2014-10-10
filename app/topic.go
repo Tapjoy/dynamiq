@@ -18,7 +18,7 @@ type Topics struct {
   // global topic configuration, should contain list of all active topics
   Config *riak.RDtMap
   // topic map
-  TopicMap map[string]Topic
+  TopicMap map[string]*Topic
   riakPool RiakPool
   queues   Queues
 }
@@ -47,7 +47,7 @@ func InitTopics(cfg Config, riakPool RiakPool, queues Queues) Topics {
     Config:   config,
     riakPool: riakPool,
     queues:   queues,
-    TopicMap: make(map[string]Topic),
+    TopicMap: make(map[string]*Topic),
   }
   go topics.syncConfig(cfg)
   return topics
@@ -59,16 +59,13 @@ func (topics Topics) InitTopic(name string) {
   bucket, _ := client.NewBucketType("maps", "config")
   config, _ := bucket.FetchMap(name)
 
-  topics.TopicMap[name] = Topic{
-    Config:   config,
-    Name:     name,
-    riakPool: topics.riakPool,
-    queues:   topics.queues,
-  }
-  if topics.TopicMap[name].Config.FetchSet("queues") == nil {
-    topics.TopicMap[name].Config.AddSet("queues")
-    topics.TopicMap[name].Config.Store()
-  }
+  topic := new(Topic)
+  topic.Config = config
+  topic.Name = name
+  topic.riakPool = topics.riakPool
+  topic.queues = topics.queues
+  topics.TopicMap[name] = topic
+
   // Add the queue to the riak store
   topics.Config.FetchSet("topics").Add([]byte(name))
   topics.Config.Store()
@@ -76,7 +73,7 @@ func (topics Topics) InitTopic(name string) {
 }
 
 //Broadcast the message to all listening queues and return the acked writes
-func (topic Topic) Broadcast(cfg Config, message string) map[string]string {
+func (topic *Topic) Broadcast(cfg Config, message string) map[string]string {
   queueWrites := make(map[string]string)
   for _, queue := range topic.Config.FetchSet("queues").GetValue() {
     //check if we've initialized this queue yet
@@ -91,17 +88,36 @@ func (topic Topic) Broadcast(cfg Config, message string) map[string]string {
   return queueWrites
 }
 
-func (topic Topic) AddQueue(name string) {
-  topic.Config.FetchSet("queues").Add([]byte(name))
+func (topic *Topic) AddQueue(name string) {
+
+  client := topic.riakPool.GetConn()
+  defer topic.riakPool.PutConn(client)
+
+  bucket, err := client.NewBucketType("maps", "config")
+  topic.Config, err = bucket.FetchMap(topic.Name)
+
+  queueSet := topic.Config.AddSet("queues")
+  queueSet.Add([]byte(name))
   topic.Config.Store()
+  topic.Config, err = bucket.FetchMap(topic.Name)
+  if err != nil {
+    log.Println(err)
+  }
 }
 
-func (topic Topic) DeleteQueue(name string) {
+func (topic *Topic) DeleteQueue(name string) {
+  client := topic.riakPool.GetConn()
+  defer topic.riakPool.PutConn(client)
+
+  bucket, _ := client.NewBucketType("maps", "config")
+  topic.Config, _ = bucket.FetchMap(topic.Name)
+
   topic.Config.FetchSet("queues").Remove([]byte(name))
   topic.Config.Store()
+  topic.Config, _ = bucket.FetchMap(topic.Name)
 }
 
-func (topic Topic) ListQueues() []string {
+func (topic *Topic) ListQueues() []string {
   list := make([]string, 0, 10)
   for _, queueName := range topic.Config.FetchSet("queues").GetValue() {
     list = append(list, string(queueName))
@@ -117,8 +133,7 @@ func (topics Topics) DeleteTopic(name string) bool {
   topics.Config.FetchSet("topics").Remove([]byte(name))
   err = topics.Config.Store()
   topics.Config, err = bucket.FetchMap("topicsConfig")
-  err = topics.TopicMap[name].Config.Destroy()
-  err = topics.TopicMap[name].Config.Store()
+  topics.TopicMap[name].Delete()
   delete(topics.TopicMap, name)
   if err != nil {
     log.Println(err)
@@ -126,6 +141,14 @@ func (topics Topics) DeleteTopic(name string) bool {
   } else {
     return true
   }
+}
+func (topic *Topic) Delete() {
+  client := topic.riakPool.GetConn()
+  defer topic.riakPool.PutConn(client)
+
+  bucket, _ := client.NewBucketType("maps", "config")
+  topic.Config, _ = bucket.FetchMap(topic.Name)
+  topic.Config.Destroy()
 }
 
 //helpers
