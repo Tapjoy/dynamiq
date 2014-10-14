@@ -58,7 +58,7 @@ func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (in
   log.Println("Node Range: " + strconv.Itoa(node_range))
   nodeStep := node_range / totalPartitions
   log.Println("nodeStep: " + strconv.Itoa(nodeStep))
-  partitionBottom := nodeStep * myPartition
+  partitionBottom := nodeStep * myPartition + nodeBottom
   log.Println("my partition: " + strconv.Itoa(myPartition))
   log.Println("partitionBottom: " + strconv.Itoa(partitionBottom))
   partitionTop := nodeStep * (myPartition + 1)
