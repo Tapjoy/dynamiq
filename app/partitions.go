@@ -61,7 +61,7 @@ func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (in
   partitionBottom := nodeStep * myPartition + nodeBottom
   log.Println("my partition: " + strconv.Itoa(myPartition))
   log.Println("partitionBottom: " + strconv.Itoa(partitionBottom))
-  partitionTop := nodeStep * (myPartition + 1)
+  partitionTop := nodeStep * (myPartition + 1) + nodeBottom
   log.Println("partitionTop: " + strconv.Itoa(partitionTop))
   return partitionBottom, partitionTop, err
 
