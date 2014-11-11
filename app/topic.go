@@ -119,8 +119,11 @@ func (topic *Topic) DeleteQueue(name string) {
 
 func (topic *Topic) ListQueues() []string {
   list := make([]string, 0, 10)
-  for _, queueName := range topic.Config.FetchSet("queues").GetValue() {
-    list = append(list, string(queueName))
+  queueList := topic.Config.FetchSet("queues")
+  if queueList != nil {
+    for _, queueName := range queueList.GetValue() {
+      list = append(list, string(queueName))
+    }
   }
   return list
 }
