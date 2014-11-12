@@ -117,7 +117,6 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
     }
     messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
     //TODO move this into the Queue.Get code
-    messageReturn := make(map[string][]map[string]interface{})
     messageList := make([]map[string]interface{}, 0, 10)
     //Format response
     for _, object := range messages {
@@ -126,12 +125,11 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
       message["body"] = string(object.Data[:])
       messageList = append(messageList, message)
     }
-    messageReturn["messages"] = messageList
     if err != nil {
       log.Println(err)
       r.JSON(204, err.Error())
     } else {
-      r.JSON(200, messageReturn)
+      r.JSON(200, messageList)
     }
   })
   m.Put("/queues/:queue/messages", func(params martini.Params, req *http.Request) string {
