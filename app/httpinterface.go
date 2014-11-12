@@ -117,18 +117,20 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
     }
     messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
     //TODO move this into the Queue.Get code
-    message_map := make(map[string]interface{})
+    messageList := make([]map[string]interface{}, 0, 10)
+    //Format response
     for _, object := range messages {
-      //get the number of bytes in the data array
-      message_map[object.Key] = string(object.Data[:])
+      message := make(map[string]interface{})
+      message["id"] = object.Key
+      message["body"] = string(object.Data[:])
+      messageList = append(messageList, message)
     }
     if err != nil {
       log.Println(err)
       r.JSON(204, err.Error())
     } else {
-      r.JSON(200, message_map)
+      r.JSON(200, messageList)
     }
-
   })
   m.Put("/queues/:queue/messages", func(params martini.Params, req *http.Request) string {
     var present bool
