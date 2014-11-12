@@ -119,8 +119,8 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
     //TODO move this into the Queue.Get code
     messageReturn := make(map[string][]map[string]interface{})
     messageList := make([]map[string]interface{}, 0, 10)
+    //Format response
     for _, object := range messages {
-      //messageReturn[object.Key] = string(object.Data[:])
       message := make(map[string]interface{})
       message["id"] = object.Key
       message["body"] = string(object.Data[:])
