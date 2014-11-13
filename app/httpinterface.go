@@ -30,16 +30,6 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
     }
     return return_string
   })
-  m.Get("/status/:queue/partitions", func(r render.Render, params martini.Params) {
-
-    //check if we've initialized this queue yet
-    var present bool
-    _, present = queues.QueueMap[params["queue"]]
-    if present != true {
-      queues.InitQueue(cfg, params["queue"])
-    }
-    r.JSON(200, map[string]interface{}{"paritions": queues.QueueMap[params["queue"]].Parts.PartitionCount()})
-  })
   m.Get("/topics", func(r render.Render) {
     topicList := make([]string, 0, 10)
     for topicName, _ := range topics.TopicMap {
@@ -100,6 +90,21 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 
     response := topics.TopicMap[params["topic"]].Broadcast(cfg, buf.String())
     r.JSON(200, response)
+  })
+
+  m.Get("/queues/:queue", func(r render.Render, params martini.Params) {
+    //check if we've initialized this queue yet
+    var present bool
+    _, present = queues.QueueMap[params["queue"]]
+    if present != true {
+      queues.InitQueue(cfg, params["queue"])
+    }
+
+    queueReturn := make(map[string]interface{})
+    queueReturn["visibility"] = cfg.Core.Visibility
+    queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
+    r.JSON(200, queueReturn)
+
   })
 
   m.Get("/queues/:queue/messages/:batchSize", func(r render.Render, params martini.Params) {
