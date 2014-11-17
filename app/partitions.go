@@ -6,6 +6,7 @@ import (
   "github.com/hashicorp/memberlist"
   "log"
   "math"
+  "math/rand"
   "sort"
   "strconv"
   "sync"
@@ -26,6 +27,7 @@ func InitPartitions(cfg Config) Partitions {
   part := Partitions{
     partitions: lane.NewPQueue(lane.MINPQ),
   }
+  part.makePartitions(cfg, cfg.Core.InitPartitions)
   return part
 }
 
@@ -124,4 +126,18 @@ func (part Partitions) getPartitionPosition(cfg Config) (int, int, error) {
   }
   log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
   return myPartition, part.partitions.Size(), err
+}
+func (part Partitions) makePartitions(cfg Config, partitionsToMake int) {
+  part.Lock()
+  defer part.Unlock()
+  var initialTime time.Time
+  offset := part.partitions.Size()
+  for partitionId := offset; partitionId < offset+partitionsToMake; partitionId++ {
+    if cfg.Core.MaxPartitions > partitionId {
+      partition := new(Partition)
+      partition.Id = partitionId
+      partition.LastUsed = initialTime
+      part.partitions.Push(partition, rand.Int63n(100000))
+    }
+  }
 }
