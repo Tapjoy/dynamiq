@@ -18,7 +18,6 @@ type Config struct {
     BackendConnectionPool int
     InitPartitions        int
     MaxPartitions         int
-    PartitionStep         int
     SyncConfigInterval    time.Duration
   }
 }

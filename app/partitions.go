@@ -2,8 +2,8 @@ package app
 
 import (
   "errors"
+  "github.com/Tapjoy/lane"
   "github.com/hashicorp/memberlist"
-  "github.com/oleiade/lane"
   "log"
   "math"
   "sort"
