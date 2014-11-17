@@ -2,6 +2,7 @@ package app
 
 import (
   "errors"
+  "github.com/Tapjoy/lane"
   "github.com/hashicorp/memberlist"
   "log"
   "math"
@@ -12,27 +13,24 @@ import (
 )
 
 type Partitions struct {
-  partitions map[int]*Partition
-  sync.Mutex
+  partitions *lane.PQueue
+  sync.RWMutex
 }
 
 type Partition struct {
   Id       int
   LastUsed time.Time
-  sync.Mutex
 }
 
 func InitPartitions(cfg Config) Partitions {
   part := Partitions{
-    partitions: make(map[int]*Partition),
+    partitions: lane.NewPQueue(lane.MINPQ),
   }
-  //make sure there is an element in the array
-  part.makePartitions(cfg, cfg.Core.InitPartitions)
   return part
 }
 
 func (part Partitions) PartitionCount() int {
-  return len(part.partitions)
+  return part.partitions.Size()
 }
 
 func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (int, int, error) {
@@ -58,10 +56,10 @@ func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (in
   log.Println("Node Range: " + strconv.Itoa(node_range))
   nodeStep := node_range / totalPartitions
   log.Println("nodeStep: " + strconv.Itoa(nodeStep))
-  partitionBottom := nodeStep * myPartition + nodeBottom
+  partitionBottom := nodeStep*myPartition + nodeBottom
   log.Println("my partition: " + strconv.Itoa(myPartition))
   log.Println("partitionBottom: " + strconv.Itoa(partitionBottom))
-  partitionTop := nodeStep * (myPartition + 1) + nodeBottom
+  partitionTop := nodeStep*(myPartition+1) + nodeBottom
   log.Println("partitionTop: " + strconv.Itoa(partitionTop))
   return partitionBottom, partitionTop, err
 
@@ -89,57 +87,41 @@ func (part Partitions) getPartitionPosition(cfg Config) (int, int, error) {
 
   //TODO move loging out of the sync operation for better throughput
   myPartition := -1
-  occupiedPartitions := 0
-  totalPartitions := len(part.partitions)
+  totalPartitions := part.partitions.Size()
+  log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
+
   var err error
-  for partitionId := range part.partitions {
-    //use visibility timeout of 30 seconds
-    log.Println("partition: " + strconv.Itoa(partitionId) + "occupied time: " + strconv.FormatFloat(time.Since(part.partitions[partitionId].LastUsed).Seconds(), 'f', -1, 64))
-    part.partitions[partitionId].Lock()
-    if time.Since(part.partitions[partitionId].LastUsed).Seconds() > cfg.Core.Visibility {
-      if myPartition == -1 {
-        myPartition = partitionId
-        part.partitions[partitionId].LastUsed = time.Now()
-
-      }
-    } else {
-      occupiedPartitions = occupiedPartitions + 1
-    }
-    part.partitions[partitionId].Unlock()
+  poppedPartition, _ := part.partitions.Pop()
+  var workingPartition *Partition
+  if poppedPartition == nil {
+    var lastUsed time.Time
+    workingPartition = new(Partition)
+    workingPartition.Id = 0
+    workingPartition.LastUsed = lastUsed
+  } else {
+    workingPartition = poppedPartition.(*Partition)
   }
-  //if I haven't found an unoccupied partition create more
-  if myPartition == -1 {
+  log.Println("partition: " + strconv.Itoa(workingPartition.Id) + " occupied time: " + strconv.FormatFloat(time.Since(workingPartition.LastUsed).Seconds(), 'f', -1, 64))
 
-    err = part.makePartitions(cfg, cfg.Core.PartitionStep)
-    if err == nil {
-      myPartition, totalPartitions, err = part.getPartitionPosition(cfg)
+  if time.Since(workingPartition.LastUsed).Seconds() > cfg.Core.Visibility {
+    myPartition = workingPartition.Id
+    workingPartition.LastUsed = time.Now()
+    part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
+  } else {
+    part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
+    part.Lock()
+    if part.partitions.Size() < cfg.Core.MaxPartitions {
+
+      workingPartition := new(Partition)
+      workingPartition.Id = part.partitions.Size()
+      workingPartition.LastUsed = time.Now()
+      myPartition = workingPartition.Id
+      part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
+    } else {
+      err = errors.New("no available partitions")
     }
+    part.Unlock()
   }
   log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
-  log.Println("occupiedPartitions:" + strconv.Itoa(occupiedPartitions))
-  return myPartition, totalPartitions, err
-}
-
-func (part Partitions) makePartitions(cfg Config, partitionsToMake int) error {
-  part.Lock()
-  defer part.Unlock()
-  offset := len(part.partitions)
-  var initialTime time.Time
-  partitionsMade := 0
-  for partitionId := offset; partitionId < offset+partitionsToMake; partitionId++ {
-    if cfg.Core.MaxPartitions > partitionId {
-      partition := new(Partition)
-      partition.Id = partitionId
-      partition.LastUsed = initialTime
-      part.partitions[partitionId] = partition
-      partitionsMade = partitionsMade + 1
-    }
-  }
-  log.Println("tried to make " + strconv.Itoa(partitionsToMake))
-  log.Println("made " + strconv.Itoa(partitionsMade))
-  if partitionsMade != partitionsToMake {
-    return errors.New("no available partitions")
-  }
-  return nil
-
+  return myPartition, part.partitions.Size(), err
 }
