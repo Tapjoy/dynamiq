@@ -53,6 +53,14 @@ GET Times
 the assumption of a log n get is based on a standard index scan, as we only need to read the beginning or end of the index it is possible to achieve O(1) GET operations
 
 
+getting started
+=========
+export GOPATH=`pwd`
+go get github.com/Tapjoy/riakQueue
+mkdir lib
+cp ./src/github.com/Tapjoy/riakQueue/lib/config.gcfg ./lib/config.gcfg
+./bin/riakQueue
+
 Implementation
 ==========
 Currently this implementation uses riak and properties 1&2. with the following algorithm
