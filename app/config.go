@@ -7,19 +7,20 @@ import (
 )
 
 type Config struct {
-  Core struct {
-    Name                  string
-    Port                  int
-    SeedServer            string
-    SeedPort              int
-    HttpPort              int
-    Visibility            float64
-    RiakNodes             string
-    BackendConnectionPool int
-    InitPartitions        int
-    MaxPartitions         int
-    SyncConfigInterval    time.Duration
-  }
+  Core Core
+}
+type Core struct {
+  Name                  string
+  Port                  int
+  SeedServer            string
+  SeedPort              int
+  HttpPort              int
+  Visibility            float64
+  RiakNodes             string
+  BackendConnectionPool int
+  InitPartitions        int
+  MaxPartitions         int
+  SyncConfigInterval    time.Duration
 }
 
 func Getconfig(config_file *string) (Config, error) {
