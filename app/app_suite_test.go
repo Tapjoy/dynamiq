@@ -46,3 +46,9 @@ var _ = BeforeSuite(func() {
 	// Disable log output during tests
 	log.SetOutput(ioutil.Discard)
 })
+
+var _ = AfterSuite(func() {
+
+	// Shut this down incase another suite of tests needs the port, or it's own instance
+	memberList.Shutdown()
+})
