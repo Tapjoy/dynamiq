@@ -2,8 +2,11 @@ package app_test
 
 import (
 	. "github.com/Tapjoy/riakQueue/app"
+	"github.com/hashicorp/memberlist"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"io/ioutil"
+	"log"
 	"testing"
 	"time"
 )
@@ -11,6 +14,7 @@ import (
 var cfg Config
 var core Core
 var duration time.Duration
+var memberList *memberlist.Memberlist
 
 func TestPartitions(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -19,6 +23,8 @@ func TestPartitions(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// Create the basic Configuration object
+	// later tests can change these values as needed
 	core = Core{
 		Name:                  "john",
 		Port:                  8000,
@@ -26,11 +32,17 @@ var _ = BeforeSuite(func() {
 		SeedPort:              8001,
 		HttpPort:              8003,
 		Visibility:            30,
-		RiakNodes:             "localhost",
+		RiakNodes:             "127.0.0.1",
 		BackendConnectionPool: 16,
-		InitPartitions:        50,
+		InitPartitions:        10,
 		MaxPartitions:         50,
 		SyncConfigInterval:    duration,
 	}
 	cfg.Core = core
+
+	// Create a memberlist, aka the list of possible RiaQ processes to communicate with
+	memberList = InitMember(cfg)
+
+	// Disable log output during tests
+	log.SetOutput(ioutil.Discard)
 })
