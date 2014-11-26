@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"github.com/Tapjoy/lane"
+	"github.com/Tapjoy/riakQueue/app/config"
 	"github.com/hashicorp/memberlist"
 	"log"
 	"math"
@@ -23,7 +24,7 @@ type Partition struct {
 	LastUsed time.Time
 }
 
-func InitPartitions(cfg Config) Partitions {
+func InitPartitions(cfg config.Config) Partitions {
 	part := Partitions{
 		partitions: lane.NewPQueue(lane.MINPQ),
 	}
@@ -35,7 +36,7 @@ func (part Partitions) PartitionCount() int {
 	return part.partitions.Size()
 }
 
-func (part Partitions) GetPartition(cfg Config, list *memberlist.Memberlist) (int, int, error) {
+func (part Partitions) GetPartition(cfg config.Config, list *memberlist.Memberlist) (int, int, error) {
 
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
@@ -84,7 +85,7 @@ func getNodePosition(list *memberlist.Memberlist) (int, int) {
 	return nodePosition, nodeCount
 }
 
-func (part Partitions) getPartitionPosition(cfg Config) (int, int, error) {
+func (part Partitions) getPartitionPosition(cfg config.Config) (int, int, error) {
 	//iterate over the partitions and then increase or decrease the number of partitions
 
 	//TODO move loging out of the sync operation for better throughput
@@ -128,7 +129,7 @@ func (part Partitions) getPartitionPosition(cfg Config) (int, int, error) {
 	return myPartition, part.partitions.Size(), err
 }
 
-func (part Partitions) makePartitions(cfg Config, partitionsToMake int) {
+func (part Partitions) makePartitions(cfg config.Config, partitionsToMake int) {
 	part.Lock()
 	defer part.Unlock()
 	var initialTime time.Time
