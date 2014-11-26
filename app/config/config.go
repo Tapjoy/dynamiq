@@ -64,14 +64,6 @@ func GetCoreConfig(config_file *string) (Config, error) {
 	return cfg, err
 }
 
-func (queues Queues) addToKnownQueues(queueName string) error {
-	client := queues.riakConnection()
-	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
-	queueSet.Add([]byte(queueName))
-	return queueSet.Store()
-}
-
 func (cfg Config) InitializeQueue(queueName string) error {
 	// Create the configuration data in Riak first
 	// This way it'll be there once the queue is added to the known set
@@ -82,6 +74,14 @@ func (cfg Config) InitializeQueue(queueName string) error {
 	// Add to the known set of queues
 	err = cfg.queues.addToKnownQueues(queueName)
 	return err
+}
+
+func (queues Queues) addToKnownQueues(queueName string) error {
+	client := queues.riakConnection()
+	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
+	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
+	queueSet.Add([]byte(queueName))
+	return queueSet.Store()
 }
 
 func (queues Queues) RemoveFromKnownQueues(queueName string) error {
@@ -97,26 +97,31 @@ func (cfg Config) GetQueueSettings(queueName string) map[string]string {
 }
 
 func loadQueuesConfig(riakPool RiakPool) Queues {
-	// Get the queues
-	client := riakPool.GetConn()
-	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
-
-	log.Print("trying to load queue set")
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
-	log.Print("loaded queue set")
+	// Create the Queues Config struct
 	queueConfig := Queues{
+		// RiakPool does not belong here - it should be moved upto Config
 		riakPool: riakPool,
 		settings: make(map[string]map[string]string),
 	}
-	log.Print("made config obj")
-
+	// Get the queues
+	client := riakPool.GetConn()
+	// TODO: We should be handling errors here
+	// Get the bucket holding the sets of config data
+	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
+	// Fetch the object for holding the set of queues
+	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
+	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
-		log.Printf("doing elem %s", elem)
+		// Convert it's name into a string
 		name := string(elem[:])
+		// Pre-warm the settings object
 		queueConfig.settings[name] = make(map[string]string)
-		// Get the settings for this queue
+		// Get the bucket for holding maps of config data
 		configBucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+		// TODO: We should be handling errors here
+		// Get the Map of values for that queue
 		obj, _ := configBucket.FetchMap(name)
+		// For each known setting name
 		for _, setting := range SETTINGS {
 			// Get the value as a string
 			strVal := registerValueToString(obj.FetchRegister(setting))
@@ -124,18 +129,26 @@ func loadQueuesConfig(riakPool RiakPool) Queues {
 			queueConfig.settings[name][setting] = strVal
 		}
 	}
-
+	// Return the completed Queue cache of settings
 	return queueConfig
 }
 
+// TODO: Take in a map which overrides the defaults
 func (queues Queues) createConfigForQueue(queueName string) error {
 	client := queues.riakConnection()
+	// Get the bucket for holding maps of config data
+	// TODO: Find a nice way to DRY this up - it's a lil copy/pasty
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	// Get the object for this queues settings
 	obj, _ := bucket.FetchMap(queueName)
+	// For each known setting
 	for _, elem := range SETTINGS {
+		// Get the reigster for this setting
 		reg := obj.AddRegister(elem)
+		// Convert the default value to a bytearray, set it on the Register
 		reg.Update([]byte(DEFAULT_SETTINGS[elem]))
 	}
+	// Save the object, returns an error up the callchain if needed
 	return obj.Store()
 }
 
