@@ -78,6 +78,7 @@ func (cfg Config) InitializeQueue(queueName string) error {
 
 func (cfg Config) addToKnownQueues(queueName string) error {
 	client := cfg.riakConnection()
+	cfg.riakReleaseConnection(client)
 	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
 	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
 	queueSet.Add([]byte(queueName))
@@ -86,6 +87,7 @@ func (cfg Config) addToKnownQueues(queueName string) error {
 
 func (cfg Config) RemoveFromKnownQueues(queueName string) error {
 	client := cfg.riakConnection()
+	cfg.riakReleaseConnection(client)
 	bucket, _ := client.NewBucket(CONFIGURATION_BUCKET)
 	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
 	queueSet.Remove([]byte(queueName))
@@ -134,6 +136,7 @@ func loadQueuesConfig(riakPool RiakPool) Queues {
 // TODO: Take in a map which overrides the defaults
 func (cfg Config) createConfigForQueue(queueName string) error {
 	client := cfg.riakConnection()
+	cfg.riakReleaseConnection(client)
 	// Get the bucket for holding maps of config data
 	// TODO: Find a nice way to DRY this up - it's a lil copy/pasty
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -198,6 +201,7 @@ func (cfg Config) get(paramName string, queueName string) (string, error) {
 	if value == "" {
 		// Read from riak
 		client := cfg.riakConnection()
+		cfg.riakReleaseConnection(client)
 		bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		obj, err := bucket.FetchMap(queueName)
 
@@ -243,4 +247,8 @@ func registerValueToString(reg *riak.RDtRegister) string {
 func (cfg Config) riakConnection() *riak.Client {
 	conn := cfg.RiakPool.GetConn()
 	return conn
+}
+
+func (cfg Config) riakReleaseConnection(client *riak.Client) {
+	defer cfg.RiakPool.PutConn(client)
 }
