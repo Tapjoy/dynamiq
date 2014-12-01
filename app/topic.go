@@ -24,9 +24,9 @@ type Topics struct {
 	queues   Queues
 }
 
-func InitTopics(cfg config.Config, riakPool config.RiakPool, queues Queues) Topics {
-	client := riakPool.GetConn()
-	defer riakPool.PutConn(client)
+func InitTopics(cfg config.Config, queues Queues) Topics {
+	client := cfg.RiakPool.GetConn()
+	defer cfg.RiakPool.PutConn(client)
 	bucket, err := client.NewBucketType("maps", "config")
 	if err != nil {
 		log.Println(err)
@@ -46,7 +46,7 @@ func InitTopics(cfg config.Config, riakPool config.RiakPool, queues Queues) Topi
 	}
 	topics := Topics{
 		Config:   config,
-		riakPool: riakPool,
+		riakPool: cfg.RiakPool,
 		queues:   queues,
 		TopicMap: make(map[string]*Topic),
 	}

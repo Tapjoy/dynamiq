@@ -26,12 +26,10 @@ type ConfigRequest struct {
 // TODO make message definitions more explicit
 
 func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
-	//init the connectionPool
-	riakPool := config.InitRiakPool(cfg)
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
-	queues := InitQueues(riakPool)
+	queues := InitQueues(cfg.RiakPool)
 	// also tieing topics this is next for refactor
-	topics := InitTopics(cfg, riakPool, queues)
+	topics := InitTopics(cfg, queues)
 	m := martini.Classic()
 	m.Use(render.Renderer())
 
