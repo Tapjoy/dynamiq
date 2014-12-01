@@ -91,12 +91,34 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 
 	})
 
-	m.Patch("/queues/:queue", binding.Json(ConfigRequest{}), func(configRequest ConfigRequest, r render.Render) {
-		log.Print(configRequest.MaxPartitions)
-		log.Print(configRequest.MinPartitions)
-		log.Print(configRequest.VisibilityTimeout)
+	m.Patch("/queues/:queue", binding.Json(ConfigRequest{}), func(configRequest ConfigRequest, r render.Render, params martini.Params) {
+		// We need to find a way to determine a natural 0 value VS the value not being provided and golang defaulting to 0
+		// That way we don't set things to 0 by accident. Currently, 0 is not a valid option for any setting, so this is easy
 
-		r.JSON(200, strconv.Itoa(configRequest.VisibilityTimeout))
+		// Not sure of better way to get the queue name from the request, but would be good to not
+		// Have to reach into params - better to bind it
+
+		// There is probably an optimal order to set these in, depending on if the values for min/max
+		// have shrunk or grown, so the system can self-adjust in the correct fashion. Or, maybe it's fine to do it however
+		var err error
+		if configRequest.VisibilityTimeout > 0 {
+			err = cfg.SetVisibilityTimeout(params["queue"], configRequest.VisibilityTimeout)
+		}
+
+		if configRequest.MinPartitions > 0 {
+			err = cfg.SetMinPartitions(params["queue"], configRequest.MinPartitions)
+		}
+
+		if configRequest.MaxPartitions > 0 {
+			err = cfg.SetMaxPartitions(params["queue"], configRequest.MaxPartitions)
+		}
+
+		if err != nil {
+			// TODO This needs to be smarter, need to check err early and often
+			r.JSON(500, "not ok")
+		} else {
+			r.JSON(200, "ok")
+		}
 	})
 
 	// END CONFIGURATION API BLOCK

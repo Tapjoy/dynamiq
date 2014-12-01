@@ -152,49 +152,49 @@ func (queues Queues) createConfigForQueue(queueName string) error {
 	return obj.Store()
 }
 
-func (queues Queues) GetVisibilityTimeout(queueName string) (int, error) {
-	val, err := queues.get(VISIBILITY_TIMEOUT, queueName)
+func (cfg Config) GetVisibilityTimeout(queueName string) (int, error) {
+	val, err := cfg.queues.get(VISIBILITY_TIMEOUT, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
-func (queues Queues) SetVisibilityTimeout(queueName string, timeout int) error {
-	return queues.set(VISIBILITY_TIMEOUT, queueName, strconv.Itoa(timeout))
+func (cfg Config) SetVisibilityTimeout(queueName string, timeout int) error {
+	return cfg.queues.set(VISIBILITY_TIMEOUT, queueName, strconv.Itoa(timeout))
 }
 
-func (queues Queues) GetMinPartitions(queueName string) (int, error) {
-	val, err := queues.get(MIN_PARTITIONS, queueName)
+func (cfg Config) GetMinPartitions(queueName string) (int, error) {
+	val, err := cfg.queues.get(MIN_PARTITIONS, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
-func (queues Queues) SetMinPartitions(queueName string, timeout int) error {
+func (cfg Config) SetMinPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
-	return queues.set(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
+	return cfg.queues.set(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
 }
 
-func (queues Queues) GetMaxPartitions(queueName string) (int, error) {
-	val, err := queues.get(MIN_PARTITIONS, queueName)
+func (cfg Config) GetMaxPartitions(queueName string) (int, error) {
+	val, err := cfg.queues.get(MAX_PARTITIONS, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
-func (queues Queues) SetMaxPartitions(queueName string, timeout int) error {
+func (cfg Config) SetMaxPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
-	return queues.set(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
+	return cfg.queues.set(MAX_PARTITIONS, queueName, strconv.Itoa(timeout))
 }
 
 // TODO Is this even wise? Do we want to store this in config info?
 // It should probably be better determined by probing the system dynamically...
-func (queues Queues) GetPartitionCount(queueName string) (int, error) {
-	val, err := queues.get(PARTITION_COUNT, queueName)
+func (cfg Config) GetPartitionCount(queueName string) (int, error) {
+	val, err := cfg.queues.get(PARTITION_COUNT, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
 func (queues Queues) get(paramName string, queueName string) (string, error) {
 	// Read from local cache
-	value := queues.settings[paramName][queueName]
+	value := queues.settings[queueName][paramName]
 	var err error
 	if value == "" {
 		// Read from riak
@@ -220,7 +220,7 @@ func (queues Queues) get(paramName string, queueName string) (string, error) {
 
 func (queues Queues) set(paramName string, queueName string, value string) error {
 	// Set the local cache
-	queues.settings[paramName][queueName] = value
+	queues.settings[queueName][paramName] = value
 	// Write to Riak
 	client := queues.riakConnection()
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
