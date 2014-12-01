@@ -162,6 +162,36 @@ func (queues Queues) SetVisibilityTimeout(queueName string, timeout int) error {
 	return queues.set(VISIBILITY_TIMEOUT, queueName, strconv.Itoa(timeout))
 }
 
+func (queues Queues) GetMinPartitions(queueName string) (int, error) {
+	val, err := queues.get(MIN_PARTITIONS, queueName)
+	parsed, err := strconv.Atoi(val)
+	return parsed, err
+}
+
+func (queues Queues) SetMinPartitions(queueName string, timeout int) error {
+	// TODO do we handle any resizing here? Or does the system "self-adjust"
+	return queues.set(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
+}
+
+func (queues Queues) GetMaxPartitions(queueName string) (int, error) {
+	val, err := queues.get(MIN_PARTITIONS, queueName)
+	parsed, err := strconv.Atoi(val)
+	return parsed, err
+}
+
+func (queues Queues) SetMaxPartitions(queueName string, timeout int) error {
+	// TODO do we handle any resizing here? Or does the system "self-adjust"
+	return queues.set(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
+}
+
+// TODO Is this even wise? Do we want to store this in config info?
+// It should probably be better determined by probing the system dynamically...
+func (queues Queues) GetPartitionCount(queueName string) (int, error) {
+	val, err := queues.get(PARTITION_COUNT, queueName)
+	parsed, err := strconv.Atoi(val)
+	return parsed, err
+}
+
 func (queues Queues) get(paramName string, queueName string) (string, error) {
 	// Read from local cache
 	value := queues.settings[paramName][queueName]

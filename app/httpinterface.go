@@ -6,11 +6,19 @@ import (
 	"github.com/Tapjoy/riakQueue/app/config"
 	"github.com/go-martini/martini"
 	"github.com/hashicorp/memberlist"
+	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"log"
 	"net/http"
 	"strconv"
 )
+
+//TODO Should this live in the config package?
+type ConfigRequest struct {
+	VisibilityTimeout int `json:"visibility_timeout"`
+	MinPartitions     int `json:"min_partitions"`
+	MaxPartitions     int `json:"max_partitions"`
+}
 
 //TODO make message definitions more explicit
 
@@ -83,8 +91,12 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 
 	})
 
-	m.Patch("/queues/:queue", func(r render.Render, params martini.Params) {
+	m.Patch("/queues/:queue", binding.Json(ConfigRequest{}), func(configRequest ConfigRequest, r render.Render) {
+		log.Print(configRequest.MaxPartitions)
+		log.Print(configRequest.MinPartitions)
+		log.Print(configRequest.VisibilityTimeout)
 
+		r.JSON(200, strconv.Itoa(configRequest.VisibilityTimeout))
 	})
 
 	// END CONFIGURATION API BLOCK
@@ -133,6 +145,8 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 		settings := cfg.GetQueueSettings(params["queue"])
 		queueReturn := make(map[string]interface{})
 		queueReturn["visibility"] = settings[config.VISIBILITY_TIMEOUT]
+		queueReturn["min_partitions"] = settings[config.MIN_PARTITIONS]
+		queueReturn["max_partitions"] = settings[config.MAX_PARTITIONS]
 		queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 		r.JSON(200, queueReturn)
 
