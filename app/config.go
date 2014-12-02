@@ -39,11 +39,8 @@ type Core struct {
 	SeedServer            string
 	SeedPort              int
 	HttpPort              int
-	Visibility            float64
 	RiakNodes             string
 	BackendConnectionPool int
-	InitPartitions        int
-	MaxPartitions         int
 	SyncConfigInterval    time.Duration
 }
 

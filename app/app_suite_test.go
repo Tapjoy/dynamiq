@@ -33,11 +33,8 @@ var _ = BeforeSuite(func() {
 		SeedServer:            "steve",
 		SeedPort:              8001,
 		HttpPort:              8003,
-		Visibility:            30,
 		RiakNodes:             "127.0.0.1",
 		BackendConnectionPool: 16,
-		InitPartitions:        10,
-		MaxPartitions:         50,
 		SyncConfigInterval:    duration,
 	}
 	queues = app.QueuesConfig{
