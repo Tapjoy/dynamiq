@@ -44,9 +44,6 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 	// END STATUS / STATISTICS API BLOCK
 
 	// CONFIGURATION API BLOCK
-	m.Put("/topics/:topic", func(r render.Render, params martini.Params) {
-
-	})
 
 	m.Delete("/topics/:topic", func(r render.Render, params martini.Params) {
 
@@ -73,10 +70,6 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
 
-	m.Delete("/queues/:queue", func(r render.Render, params martini.Params) {
-
-	})
-
 	// neeeds a little work....
 	m.Delete("/topics/:topic/queues/:queue", func(r render.Render, params martini.Params) {
 		var present bool
@@ -86,10 +79,6 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 		}
 		topics.TopicMap[params["topic"]].DeleteQueue(params["queue"])
 		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
-	})
-
-	m.Patch("/topics/:topic/queues/:queue", func(r render.Render, params martini.Params) {
-
 	})
 
 	m.Patch("/queues/:queue", binding.Json(ConfigRequest{}), func(configRequest ConfigRequest, r render.Render, params martini.Params) {
@@ -113,7 +102,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 
 		if err != nil {
 			// TODO This needs to be smarter, need to check err early and often
-			r.JSON(500, "not ok")
+			r.JSON(500, err)
 		} else {
 			r.JSON(200, "ok")
 		}
