@@ -1,13 +1,12 @@
 package app
 
 import (
-	"github.com/Tapjoy/riakQueue/app/config"
 	"github.com/hashicorp/memberlist"
 	"log"
 	"strconv"
 )
 
-func InitMember(cfg config.Config) *memberlist.Memberlist {
+func InitMember(cfg Config) *memberlist.Memberlist {
 	memberConf := memberlist.DefaultLANConfig()
 	memberConf.Name = cfg.Core.Name
 	memberConf.BindPort = cfg.Core.Port

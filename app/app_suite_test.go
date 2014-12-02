@@ -1,7 +1,7 @@
 package app_test
 
 import (
-	. "github.com/Tapjoy/riakQueue/app"
+	"github.com/Tapjoy/riakQueue/app"
 	"github.com/hashicorp/memberlist"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -11,10 +11,12 @@ import (
 	"time"
 )
 
-var cfg Config
-var core Core
+var cfg app.Config
+var core app.Core
+var queues app.QueuesConfig
 var duration time.Duration
 var memberList *memberlist.Memberlist
+var testQueueName = "test_queue"
 
 func TestPartitions(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -25,7 +27,7 @@ func TestPartitions(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// Create the basic Configuration object
 	// later tests can change these values as needed
-	core = Core{
+	core = app.Core{
 		Name:                  "john",
 		Port:                  8000,
 		SeedServer:            "steve",
@@ -38,10 +40,19 @@ var _ = BeforeSuite(func() {
 		MaxPartitions:         50,
 		SyncConfigInterval:    duration,
 	}
+	queues = app.QueuesConfig{
+		Settings: make(map[string]map[string]string),
+	}
+	queues.Settings[testQueueName] = make(map[string]string)
+	queues.Settings[testQueueName][app.VISIBILITY_TIMEOUT] = "30"
+	queues.Settings[testQueueName][app.MIN_PARTITIONS] = "10"
+	queues.Settings[testQueueName][app.MAX_PARTITIONS] = "50"
+
 	cfg.Core = core
+	cfg.Queues = queues
 
 	// Create a memberlist, aka the list of possible RiaQ processes to communicate with
-	memberList = InitMember(cfg)
+	memberList = app.InitMember(cfg)
 
 	// Disable log output during tests
 	log.SetOutput(ioutil.Discard)

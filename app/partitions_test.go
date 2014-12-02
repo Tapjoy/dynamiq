@@ -17,7 +17,7 @@ var _ = Describe("Partition", func() {
 
 	BeforeEach(func() {
 		// Load up a list of partitions
-		partitions = InitPartitions(cfg)
+		partitions = InitPartitions(cfg, testQueueName)
 	})
 
 	Context("InitPartitions", func() {
@@ -29,7 +29,7 @@ var _ = Describe("Partition", func() {
 	Context("GetPartition", func() {
 		BeforeEach(func() {
 			// Get the partition ids, and any errors
-			partitionBottomId, partitionTopId, err = partitions.GetPartition(cfg, memberList)
+			partitionBottomId, partitionTopId, err = partitions.GetPartition(cfg, testQueueName, memberList)
 		})
 
 		It("should get a partitionTopId", func() {

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"github.com/Tapjoy/riakQueue/app/config"
 	"github.com/tpjg/goriakpbc"
 	"log"
 	"time"
@@ -11,7 +10,7 @@ type Topic struct {
 	// store a CRDT in riak for the topic configuration including subscribers
 	Name     string
 	Config   *riak.RDtMap
-	riakPool config.RiakPool
+	riakPool RiakPool
 	queues   Queues
 }
 
@@ -20,11 +19,11 @@ type Topics struct {
 	Config *riak.RDtMap
 	// topic map
 	TopicMap map[string]*Topic
-	riakPool config.RiakPool
+	riakPool RiakPool
 	queues   Queues
 }
 
-func InitTopics(cfg config.Config, queues Queues) Topics {
+func InitTopics(cfg Config, queues Queues) Topics {
 	client := cfg.RiakPool.GetConn()
 	defer cfg.RiakPool.PutConn(client)
 	bucket, err := client.NewBucketType("maps", "config")
@@ -74,7 +73,7 @@ func (topics Topics) InitTopic(name string) {
 }
 
 //Broadcast the message to all listening queues and return the acked writes
-func (topic *Topic) Broadcast(cfg config.Config, message string) map[string]string {
+func (topic *Topic) Broadcast(cfg Config, message string) map[string]string {
 	queueWrites := make(map[string]string)
 	for _, queue := range topic.Config.FetchSet("queues").GetValue() {
 		//check if we've initialized this queue yet
@@ -157,7 +156,7 @@ func (topic *Topic) Delete() {
 
 //helpers
 //TODO move error handling for empty config in riak to initializer
-func (topics Topics) syncConfig(cfg config.Config) {
+func (topics Topics) syncConfig(cfg Config) {
 	for {
 		log.Println("syncing with Riak")
 		//refresh the topic RDtMap

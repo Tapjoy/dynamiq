@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"fmt"
-	"github.com/Tapjoy/riakQueue/app/config"
 	"github.com/go-martini/martini"
 	"github.com/hashicorp/memberlist"
 	"github.com/martini-contrib/binding"
@@ -18,14 +17,14 @@ import (
 // omitempty tells it to ignore anything where the name was provided, but an empty value
 // inside of a request body.
 type ConfigRequest struct {
-	VisibilityTimeout *int `json:"visibility_timeout,omitempty"`
-	MinPartitions     *int `json:"min_partitions,omitempty"`
-	MaxPartitions     *int `json:"max_partitions,omitempty"`
+	VisibilityTimeout *float64 `json:"visibility_timeout,omitempty"`
+	MinPartitions     *int     `json:"min_partitions,omitempty"`
+	MaxPartitions     *int     `json:"max_partitions,omitempty"`
 }
 
 // TODO make message definitions more explicit
 
-func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
+func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	queues := InitQueues(cfg.RiakPool)
 	// also tieing topics this is next for refactor
@@ -170,9 +169,9 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 		}
 		settings := cfg.GetQueueSettings(params["queue"])
 		queueReturn := make(map[string]interface{})
-		queueReturn["visibility"] = settings[config.VISIBILITY_TIMEOUT]
-		queueReturn["min_partitions"] = settings[config.MIN_PARTITIONS]
-		queueReturn["max_partitions"] = settings[config.MAX_PARTITIONS]
+		queueReturn["visibility_timeout"] = settings[VISIBILITY_TIMEOUT]
+		queueReturn["min_partitions"] = settings[MIN_PARTITIONS]
+		queueReturn["max_partitions"] = settings[MAX_PARTITIONS]
 		queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 		r.JSON(200, queueReturn)
 

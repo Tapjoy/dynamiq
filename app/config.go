@@ -1,9 +1,7 @@
-package config
+package app
 
 import (
 	"code.google.com/p/gcfg"
-	//"encoding/json"
-	//"github.com/hashicorp/memberlist"
 	"errors"
 	"github.com/tpjg/goriakpbc"
 	"log"
@@ -31,7 +29,7 @@ var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COU
 
 type Config struct {
 	Core     Core
-	queues   Queues
+	Queues   QueuesConfig
 	RiakPool RiakPool
 }
 
@@ -49,8 +47,8 @@ type Core struct {
 	SyncConfigInterval    time.Duration
 }
 
-type Queues struct {
-	settings map[string]map[string]string
+type QueuesConfig struct {
+	Settings map[string]map[string]string
 }
 
 func GetCoreConfig(config_file *string) (Config, error) {
@@ -60,14 +58,14 @@ func GetCoreConfig(config_file *string) (Config, error) {
 		log.Fatal(err)
 	}
 	cfg.RiakPool = InitRiakPool(cfg)
-	cfg.queues = loadQueuesConfig(cfg.RiakPool)
+	cfg.Queues = loadQueuesConfig(cfg.RiakPool)
 	return cfg, err
 }
 
-func loadQueuesConfig(riakPool RiakPool) Queues {
+func loadQueuesConfig(riakPool RiakPool) QueuesConfig {
 	// Create the Queues Config struct
-	queueConfig := Queues{
-		settings: make(map[string]map[string]string),
+	queuesConfig := QueuesConfig{
+		Settings: make(map[string]map[string]string),
 	}
 	// Get the queues
 	client := riakPool.GetConn()
@@ -82,7 +80,7 @@ func loadQueuesConfig(riakPool RiakPool) Queues {
 		// Convert it's name into a string
 		name := string(elem[:])
 		// Pre-warm the settings object
-		queueConfig.settings[name] = make(map[string]string)
+		queuesConfig.Settings[name] = make(map[string]string)
 		// Get the bucket for holding maps of config data
 		configBucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		// TODO: We should be handling errors here
@@ -93,11 +91,11 @@ func loadQueuesConfig(riakPool RiakPool) Queues {
 			// Get the value as a string
 			strVal := registerValueToString(obj.FetchRegister(setting))
 			// Set in cache
-			queueConfig.settings[name][setting] = strVal
+			queuesConfig.Settings[name][setting] = strVal
 		}
 	}
 	// Return the completed Queue cache of settings
-	return queueConfig
+	return queuesConfig
 }
 
 func (cfg Config) InitializeQueue(queueName string) error {
@@ -153,17 +151,17 @@ func (cfg Config) createConfigForQueue(queueName string) error {
 // SETTERS AND GETTERS FOR QUEUE CONFIG
 
 func (cfg Config) GetQueueSettings(queueName string) map[string]string {
-	return cfg.queues.settings[queueName]
+	return cfg.Queues.Settings[queueName]
 }
 
-func (cfg Config) GetVisibilityTimeout(queueName string) (int, error) {
+func (cfg Config) GetVisibilityTimeout(queueName string) (float64, error) {
 	val, err := cfg.getQueueSetting(VISIBILITY_TIMEOUT, queueName)
-	parsed, err := strconv.Atoi(val)
+	parsed, err := strconv.ParseFloat(val, 32)
 	return parsed, err
 }
 
-func (cfg Config) SetVisibilityTimeout(queueName string, timeout int) error {
-	return cfg.setQueueSetting(VISIBILITY_TIMEOUT, queueName, strconv.Itoa(timeout))
+func (cfg Config) SetVisibilityTimeout(queueName string, timeout float64) error {
+	return cfg.setQueueSetting(VISIBILITY_TIMEOUT, queueName, strconv.FormatFloat(timeout, 'f', -1, 64))
 }
 
 func (cfg Config) GetMinPartitions(queueName string) (int, error) {
@@ -191,7 +189,7 @@ func (cfg Config) SetMaxPartitions(queueName string, timeout int) error {
 // TODO Find a proper way to scope this to a queue VS a topic
 func (cfg Config) getQueueSetting(paramName string, queueName string) (string, error) {
 	// Read from local cache
-	value := cfg.queues.settings[queueName][paramName]
+	value := cfg.Queues.Settings[queueName][paramName]
 	var err error
 	if value == "" {
 		// Read from riak
@@ -219,7 +217,7 @@ func (cfg Config) getQueueSetting(paramName string, queueName string) (string, e
 // TODO Find a proper way to scope this to a queue VS a topic
 func (cfg Config) setQueueSetting(paramName string, queueName string, value string) error {
 	// Set the local cache
-	cfg.queues.settings[queueName][paramName] = value
+	cfg.Queues.Settings[queueName][paramName] = value
 	// Write to Riak
 	client := cfg.riakConnection()
 	defer cfg.RiakPool.PutConn(client)

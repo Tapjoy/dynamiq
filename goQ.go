@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"github.com/Tapjoy/riakQueue/app"
-	"github.com/Tapjoy/riakQueue/app/config"
 	"log"
 )
 
@@ -13,7 +12,7 @@ func main() {
 	flag.Parse()
 
 	//setup the config file
-	cfg, err := config.GetCoreConfig(config_file)
+	cfg, err := app.GetCoreConfig(config_file)
 	if err != nil {
 		log.Fatal(err)
 	}

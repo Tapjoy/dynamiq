@@ -1,7 +1,6 @@
 package app
 
 import (
-	"github.com/Tapjoy/riakQueue/app/config"
 	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
 	"log"
@@ -16,7 +15,7 @@ type Queues struct {
 	QueueMap map[string]Queue
 	//container for all objects
 	// connection pool for riak
-	riakPool config.RiakPool
+	riakPool RiakPool
 }
 type Queue struct {
 	// the definition of a queue
@@ -25,11 +24,11 @@ type Queue struct {
 	// the partitions of the queue
 	Parts Partitions
 	// Riak connection Pool
-	riakPool config.RiakPool
+	riakPool RiakPool
 }
 
 //lazy load the queues
-func InitQueues(riakPool config.RiakPool) Queues {
+func InitQueues(riakPool RiakPool) Queues {
 	queues := Queues{
 		QueueMap: make(map[string]Queue),
 		riakPool: riakPool,
@@ -37,19 +36,19 @@ func InitQueues(riakPool config.RiakPool) Queues {
 	return queues
 }
 
-func (queues Queues) InitQueue(cfg config.Config, name string) {
+func (queues Queues) InitQueue(cfg Config, name string) {
 	// First, create the queue in Riak
 	queues.QueueMap[name] = Queue{
 		Name:     name,
-		Parts:    InitPartitions(cfg),
+		Parts:    InitPartitions(cfg, name),
 		riakPool: queues.riakPool,
 	}
 }
 
 // get a message from the queue
-func (queue Queue) Get(cfg config.Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
+func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions
-	partBottom, partTop, err := queue.Parts.GetPartition(cfg, list)
+	partBottom, partTop, err := queue.Parts.GetPartition(cfg, queue.Name, list)
 
 	if err != nil {
 		return nil, err
@@ -74,7 +73,7 @@ func (queue Queue) Get(cfg config.Config, list *memberlist.Memberlist, batchsize
 }
 
 // Put a Message onto the queue
-func (queue Queue) Put(cfg config.Config, message string) string {
+func (queue Queue) Put(cfg Config, message string) string {
 	//Grab our bucket
 	client := queue.riakPool.GetConn()
 	defer queue.riakPool.PutConn(client)
@@ -97,7 +96,7 @@ func (queue Queue) Put(cfg config.Config, message string) string {
 }
 
 // Delete a Message from the queue
-func (queue Queue) Delete(cfg config.Config, id string) bool {
+func (queue Queue) Delete(cfg Config, id string) bool {
 	client := queue.riakPool.GetConn()
 	defer queue.riakPool.PutConn(client)
 	bucket, err := client.NewBucket(queue.Name)
@@ -116,7 +115,7 @@ func (queue Queue) Delete(cfg config.Config, id string) bool {
 }
 
 // helpers
-func (queue Queue) RetrieveMessages(ids []string, cfg config.Config) []riak.RObject {
+func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
 	var rObjectArrayChan = make(chan []riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
