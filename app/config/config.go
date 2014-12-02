@@ -64,40 +64,6 @@ func GetCoreConfig(config_file *string) (Config, error) {
 	return cfg, err
 }
 
-func (cfg Config) InitializeQueue(queueName string) error {
-	// Create the configuration data in Riak first
-	// This way it'll be there once the queue is added to the known set
-	err := cfg.createConfigForQueue(queueName)
-	if err != nil {
-		return err
-	}
-	// Add to the known set of queues
-	err = cfg.addToKnownQueues(queueName)
-	return err
-}
-
-func (cfg Config) addToKnownQueues(queueName string) error {
-	client := cfg.riakConnection()
-	defer cfg.RiakPool.PutConn(client)
-	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
-	queueSet.Add([]byte(queueName))
-	return queueSet.Store()
-}
-
-func (cfg Config) RemoveFromKnownQueues(queueName string) error {
-	client := cfg.riakConnection()
-	defer cfg.RiakPool.PutConn(client)
-	bucket, _ := client.NewBucket(CONFIGURATION_BUCKET)
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
-	queueSet.Remove([]byte(queueName))
-	return queueSet.Store()
-}
-
-func (cfg Config) GetQueueSettings(queueName string) map[string]string {
-	return cfg.queues.settings[queueName]
-}
-
 func loadQueuesConfig(riakPool RiakPool) Queues {
 	// Create the Queues Config struct
 	queueConfig := Queues{
@@ -105,7 +71,7 @@ func loadQueuesConfig(riakPool RiakPool) Queues {
 	}
 	// Get the queues
 	client := riakPool.GetConn()
-	defer cfg.RiakPool.PutConn(client)
+	defer riakPool.PutConn(client)
 	// TODO: We should be handling errors here
 	// Get the bucket holding the sets of config data
 	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
@@ -134,6 +100,36 @@ func loadQueuesConfig(riakPool RiakPool) Queues {
 	return queueConfig
 }
 
+func (cfg Config) InitializeQueue(queueName string) error {
+	// Create the configuration data in Riak first
+	// This way it'll be there once the queue is added to the known set
+	err := cfg.createConfigForQueue(queueName)
+	if err != nil {
+		return err
+	}
+	// Add to the known set of queues
+	err = cfg.addToKnownQueues(queueName)
+	return err
+}
+
+func (cfg Config) addToKnownQueues(queueName string) error {
+	client := cfg.riakConnection()
+	defer cfg.RiakPool.PutConn(client)
+	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
+	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
+	queueSet.Add([]byte(queueName))
+	return queueSet.Store()
+}
+
+func (cfg Config) removeFromKnownQueues(queueName string) error {
+	client := cfg.riakConnection()
+	defer cfg.RiakPool.PutConn(client)
+	bucket, _ := client.NewBucket(CONFIGURATION_BUCKET)
+	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
+	queueSet.Remove([]byte(queueName))
+	return queueSet.Store()
+}
+
 // TODO: Take in a map which overrides the defaults
 func (cfg Config) createConfigForQueue(queueName string) error {
 	client := cfg.riakConnection()
@@ -154,48 +150,46 @@ func (cfg Config) createConfigForQueue(queueName string) error {
 	return obj.Store()
 }
 
+// SETTERS AND GETTERS FOR QUEUE CONFIG
+
+func (cfg Config) GetQueueSettings(queueName string) map[string]string {
+	return cfg.queues.settings[queueName]
+}
+
 func (cfg Config) GetVisibilityTimeout(queueName string) (int, error) {
-	val, err := cfg.get(VISIBILITY_TIMEOUT, queueName)
+	val, err := cfg.getQueueSetting(VISIBILITY_TIMEOUT, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
 func (cfg Config) SetVisibilityTimeout(queueName string, timeout int) error {
-	return cfg.set(VISIBILITY_TIMEOUT, queueName, strconv.Itoa(timeout))
+	return cfg.setQueueSetting(VISIBILITY_TIMEOUT, queueName, strconv.Itoa(timeout))
 }
 
 func (cfg Config) GetMinPartitions(queueName string) (int, error) {
-	val, err := cfg.get(MIN_PARTITIONS, queueName)
+	val, err := cfg.getQueueSetting(MIN_PARTITIONS, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
 func (cfg Config) SetMinPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
-	return cfg.set(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
+	return cfg.setQueueSetting(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
 }
 
 func (cfg Config) GetMaxPartitions(queueName string) (int, error) {
-	val, err := cfg.get(MAX_PARTITIONS, queueName)
+	val, err := cfg.getQueueSetting(MAX_PARTITIONS, queueName)
 	parsed, err := strconv.Atoi(val)
 	return parsed, err
 }
 
 func (cfg Config) SetMaxPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
-	return cfg.set(MAX_PARTITIONS, queueName, strconv.Itoa(timeout))
-}
-
-// TODO Is this even wise? Do we want to store this in config info?
-// It should probably be better determined by probing the system dynamically...
-func (cfg Config) GetPartitionCount(queueName string) (int, error) {
-	val, err := cfg.get(PARTITION_COUNT, queueName)
-	parsed, err := strconv.Atoi(val)
-	return parsed, err
+	return cfg.setQueueSetting(MAX_PARTITIONS, queueName, strconv.Itoa(timeout))
 }
 
 // TODO Find a proper way to scope this to a queue VS a topic
-func (cfg Config) get(paramName string, queueName string) (string, error) {
+func (cfg Config) getQueueSetting(paramName string, queueName string) (string, error) {
 	// Read from local cache
 	value := cfg.queues.settings[queueName][paramName]
 	var err error
@@ -223,7 +217,7 @@ func (cfg Config) get(paramName string, queueName string) (string, error) {
 }
 
 // TODO Find a proper way to scope this to a queue VS a topic
-func (cfg Config) set(paramName string, queueName string, value string) error {
+func (cfg Config) setQueueSetting(paramName string, queueName string, value string) error {
 	// Set the local cache
 	cfg.queues.settings[queueName][paramName] = value
 	// Write to Riak
@@ -241,6 +235,8 @@ func (cfg Config) set(paramName string, queueName string, value string) error {
 	// Communicate to memberlist
 	return obj.Store()
 }
+
+// HELPERS
 
 func registerValueToString(reg *riak.RDtRegister) string {
 	return string(reg.Value[:])

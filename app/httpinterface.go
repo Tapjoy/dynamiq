@@ -87,25 +87,42 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 
 		// There is probably an optimal order to set these in, depending on if the values for min/max
 		// have shrunk or grown, so the system can self-adjust in the correct fashion. Or, maybe it's fine to do it however
+
+		// Should we detect and throw errors on incorrect configuration names? Would make debugging simpler
+
+		// Likely all of this belongs in config, where we just pass in an interface to the request object, and it
+		// returns the first error it runs across. Would simplify the code here greatly.
 		var err error
 		if configRequest.VisibilityTimeout != nil {
 			err = cfg.SetVisibilityTimeout(params["queue"], *configRequest.VisibilityTimeout)
+			// We really need a proper way to generalize error handling
+			// Writing this out every time is going to be silly
+			if err != nil {
+				log.Println(err)
+				r.JSON(500, map[string]interface{}{"error": err.Error()})
+				return
+			}
 		}
 
 		if configRequest.MinPartitions != nil {
 			err = cfg.SetMinPartitions(params["queue"], *configRequest.MinPartitions)
+			if err != nil {
+				log.Println(err)
+				r.JSON(500, map[string]interface{}{"error": err.Error()})
+				return
+			}
 		}
 
 		if configRequest.MaxPartitions != nil {
 			err = cfg.SetMaxPartitions(params["queue"], *configRequest.MaxPartitions)
+			if err != nil {
+				log.Println(err)
+				r.JSON(500, map[string]interface{}{"error": err.Error()})
+				return
+			}
 		}
 
-		if err != nil {
-			// TODO This needs to be smarter, need to check err early and often
-			r.JSON(500, err)
-		} else {
-			r.JSON(200, "ok")
-		}
+		r.JSON(200, "ok")
 	})
 
 	// END CONFIGURATION API BLOCK
@@ -221,4 +238,11 @@ func InitWebserver(list *memberlist.Memberlist, cfg config.Config) {
 	// DATA INTERACTION API BLOCK
 
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
+}
+
+func HandleError(r render.Render, status_code int, err error) {
+	if err != nil {
+		log.Println(err)
+		r.JSON(status_code, err.Error())
+	}
 }
