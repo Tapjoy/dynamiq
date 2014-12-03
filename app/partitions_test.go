@@ -1,7 +1,7 @@
 package app_test
 
 import (
-	. "github.com/Tapjoy/riakQueue/app"
+	"github.com/Tapjoy/riakQueue/app"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -9,7 +9,7 @@ import (
 var _ = Describe("Partition", func() {
 
 	var (
-		partitions        Partitions
+		partitions        app.Partitions
 		err               error
 		partitionTopId    int
 		partitionBottomId int
@@ -17,19 +17,20 @@ var _ = Describe("Partition", func() {
 
 	BeforeEach(func() {
 		// Load up a list of partitions
-		partitions = InitPartitions(cfg)
+		partitions = app.InitPartitions(cfg, testQueueName)
 	})
 
 	Context("InitPartitions", func() {
 		It("should return a number of partitions equal to the configured amount", func() {
-			Expect(partitions.PartitionCount()).To(Equal(cfg.Core.InitPartitions))
+			minParts, _ := cfg.GetMinPartitions(testQueueName)
+			Expect(partitions.PartitionCount()).To(Equal(minParts))
 		})
 	})
 
 	Context("GetPartition", func() {
 		BeforeEach(func() {
 			// Get the partition ids, and any errors
-			partitionBottomId, partitionTopId, err = partitions.GetPartition(cfg, memberList)
+			partitionBottomId, partitionTopId, err = partitions.GetPartition(cfg, testQueueName, memberList)
 		})
 
 		It("should get a partitionTopId", func() {
