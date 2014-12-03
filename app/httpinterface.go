@@ -26,7 +26,8 @@ type ConfigRequest struct {
 
 func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
-	queues := InitQueues(cfg.RiakPool)
+	// Queues.Queues is dumb. Need a better name-chain
+	queues := cfg.Queues
 	// also tieing topics this is next for refactor
 	topics := InitTopics(cfg, queues)
 	m := martini.Classic()
@@ -164,71 +165,73 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		//check if we've initialized this queue yet
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
-		if present != true {
-			queues.InitQueue(cfg, params["queue"])
+		if present == true {
+			queueReturn := make(map[string]interface{})
+			queueReturn["visibility_timeout"], _ = cfg.GetVisibilityTimeout(params["queue"])
+			queueReturn["min_partitions"], _ = cfg.GetMinPartitions(params["queue"])
+			queueReturn["max_partitions"], _ = cfg.GetMaxPartitions(params["queue"])
+			queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
+			r.JSON(200, queueReturn)
+		} else {
+			r.JSON(204, fmt.Sprintf("There is no queue named %s", params["queue"]))
 		}
-		settings := cfg.GetQueueSettings(params["queue"])
-		queueReturn := make(map[string]interface{})
-		queueReturn["visibility_timeout"] = settings[VISIBILITY_TIMEOUT]
-		queueReturn["min_partitions"] = settings[MIN_PARTITIONS]
-		queueReturn["max_partitions"] = settings[MAX_PARTITIONS]
-		queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
-		r.JSON(200, queueReturn)
-
 	})
 
 	m.Get("/queues/:queue/messages/:batchSize", func(r render.Render, params martini.Params) {
 		//check if we've initialized this queue yet
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
-		if present != true {
-			queues.InitQueue(cfg, params["queue"])
-		}
-		batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
-		if err != nil {
-			//log the error for unparsable input
-			log.Println(err)
-			r.JSON(422, err.Error())
-		}
-		messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
-		//TODO move this into the Queue.Get code
-		messageList := make([]map[string]interface{}, 0, 10)
-		//Format response
-		for _, object := range messages {
-			message := make(map[string]interface{})
-			message["id"] = object.Key
-			message["body"] = string(object.Data[:])
-			messageList = append(messageList, message)
-		}
-		if err != nil {
-			log.Println(err)
-			r.JSON(204, err.Error())
+		if present == true {
+			batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
+			if err != nil {
+				//log the error for unparsable input
+				log.Println(err)
+				r.JSON(422, err.Error())
+			}
+			messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
+			//TODO move this into the Queue.Get code
+			messageList := make([]map[string]interface{}, 0, 10)
+			//Format response
+			for _, object := range messages {
+				message := make(map[string]interface{})
+				message["id"] = object.Key
+				message["body"] = string(object.Data[:])
+				messageList = append(messageList, message)
+			}
+			if err != nil {
+				log.Println(err)
+				r.JSON(204, err.Error())
+			} else {
+				r.JSON(200, messageList)
+			}
 		} else {
-			r.JSON(200, messageList)
+			// What is a sane result here?
+			r.JSON(204, fmt.Sprintf("There is no queue named %s", params["queue"]))
 		}
 	})
 
 	m.Put("/queues/:queue/messages", func(params martini.Params, req *http.Request) string {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
-		if present != true {
-			queues.InitQueue(cfg, params["queue"])
+		if present == true {
+			// parse the request body into a sting
+			// TODO clean this up, full json api?
+			var buf bytes.Buffer
+			buf.ReadFrom(req.Body)
+			uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String())
+
+			return uuid
+		} else {
+			// What is a sane response to this?
+			return ""
 		}
-
-		// parse the request body into a sting
-		// TODO clean this up, full json api?
-		var buf bytes.Buffer
-		buf.ReadFrom(req.Body)
-		uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String())
-
-		return uuid
 	})
 
 	m.Delete("/queues/:queue/message/:messageId", func(r render.Render, params martini.Params) {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
-			queues.InitQueue(cfg, params["queue"])
+			cfg.InitializeQueue(params["queue"])
 		}
 
 		r.JSON(200, queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"]))

@@ -79,11 +79,13 @@ func (topic *Topic) Broadcast(cfg Config, message string) map[string]string {
 		//check if we've initialized this queue yet
 		var present bool
 		_, present = topic.queues.QueueMap[string(queue)]
-		if present != true {
-			topic.queues.InitQueue(cfg, string(queue))
+		if present == true {
+			uuid := topic.queues.QueueMap[string(queue)].Put(cfg, message)
+			queueWrites[string(queue)] = uuid
+		} else {
+			// Return something indicating no queue?
+			// SNS -> SQS would simply blindly accept the write and NOOP
 		}
-		uuid := topic.queues.QueueMap[string(queue)].Put(cfg, message)
-		queueWrites[string(queue)] = uuid
 	}
 	return queueWrites
 }
@@ -161,7 +163,7 @@ func (topics Topics) syncConfig(cfg Config) {
 		log.Println("syncing with Riak")
 		//refresh the topic RDtMap
 		client := topics.riakPool.GetConn()
-		bucket, err := client.NewBucketType("maps", "config")
+		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
 			log.Println(err)
 		}

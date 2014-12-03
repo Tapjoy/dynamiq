@@ -13,36 +13,17 @@ import (
 type Queues struct {
 	// a container for all queues
 	QueueMap map[string]Queue
-	//container for all objects
-	// connection pool for riak
-	riakPool RiakPool
 }
+
 type Queue struct {
 	// the definition of a queue
 	// name of the queue
 	Name string
 	// the partitions of the queue
 	Parts Partitions
-	// Riak connection Pool
-	riakPool RiakPool
-}
-
-//lazy load the queues
-func InitQueues(riakPool RiakPool) Queues {
-	queues := Queues{
-		QueueMap: make(map[string]Queue),
-		riakPool: riakPool,
-	}
-	return queues
-}
-
-func (queues Queues) InitQueue(cfg Config, name string) {
-	// First, create the queue in Riak
-	queues.QueueMap[name] = Queue{
-		Name:     name,
-		Parts:    InitPartitions(cfg, name),
-		riakPool: queues.riakPool,
-	}
+	// Individual settings for the queue
+	//Settings map[string]string
+	Settings *riak.RDtMap
 }
 
 // get a message from the queue
@@ -54,8 +35,8 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 		return nil, err
 	}
 	// grab a riak client
-	client := queue.riakPool.GetConn()
-	defer queue.riakPool.PutConn(client)
+	client := cfg.RiakConnection()
+	defer cfg.ReleaseRiakConnection(client)
 
 	//set the bucket
 	bucket, err := client.NewBucket(queue.Name)
@@ -75,8 +56,8 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 // Put a Message onto the queue
 func (queue Queue) Put(cfg Config, message string) string {
 	//Grab our bucket
-	client := queue.riakPool.GetConn()
-	defer queue.riakPool.PutConn(client)
+	client := cfg.RiakConnection()
+	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
 		//Retrieve a UUID
@@ -97,8 +78,8 @@ func (queue Queue) Put(cfg Config, message string) string {
 
 // Delete a Message from the queue
 func (queue Queue) Delete(cfg Config, id string) bool {
-	client := queue.riakPool.GetConn()
-	defer queue.riakPool.PutConn(client)
+	client := cfg.RiakConnection()
+	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
 		log.Println("Deleting: ", id)
@@ -124,8 +105,8 @@ func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
 	for i := 0; i < len(ids); i++ {
 		go func() {
 			var riakKey string
-			client := queue.riakPool.GetConn()
-			defer queue.riakPool.PutConn(client)
+			client := cfg.RiakConnection()
+			defer cfg.ReleaseRiakConnection(client)
 			//fmt.Println("Getting bucket")
 			bucket, _ := client.NewBucket(queue.Name)
 			riakKey = <-rKeys
