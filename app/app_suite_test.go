@@ -5,6 +5,8 @@ import (
 	"github.com/hashicorp/memberlist"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/tpjg/goriakpbc"
+	"github.com/tpjg/goriakpbc/pb"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -13,10 +15,11 @@ import (
 
 var cfg app.Config
 var core app.Core
-var queues app.QueuesConfig
+var queues app.Queues
 var duration time.Duration
 var memberList *memberlist.Memberlist
 var testQueueName = "test_queue"
+var RDtMap *riak.RDtMap
 
 func TestPartitions(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -37,13 +40,27 @@ var _ = BeforeSuite(func() {
 		BackendConnectionPool: 16,
 		SyncConfigInterval:    duration,
 	}
-	queues = app.QueuesConfig{
-		Settings: make(map[string]map[string]string),
+
+	queueMap := make(map[string]app.Queue)
+	configRDtMap := riak.RDtMap{
+		Values:   make(map[riak.MapKey]interface{}),
+		ToAdd:    make([]*pb.MapUpdate, 1),
+		ToRemove: make([]*pb.MapField, 1),
 	}
-	queues.Settings[testQueueName] = make(map[string]string)
-	queues.Settings[testQueueName][app.VISIBILITY_TIMEOUT] = "30"
-	queues.Settings[testQueueName][app.MIN_PARTITIONS] = "10"
-	queues.Settings[testQueueName][app.MAX_PARTITIONS] = "50"
+
+	configRDtMap.Values[riak.MapKey{Key: "max_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte("50")}
+	configRDtMap.Values[riak.MapKey{Key: "min_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte("50")}
+	configRDtMap.Values[riak.MapKey{Key: "visibility_timeout", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte("50")}
+
+	queue := app.Queue{
+		Name:   testQueueName,
+		Config: &configRDtMap,
+	}
+	queueMap[testQueueName] = queue
+
+	queues = app.Queues{
+		QueueMap: queueMap,
+	}
 
 	cfg.Core = core
 	cfg.Queues = queues
