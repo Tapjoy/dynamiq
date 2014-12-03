@@ -231,7 +231,7 @@ func (topic Topic) syncConfig() {
 	//refresh the topic RDtMap
 	client := topic.riakPool.GetConn()
 	defer topic.riakPool.PutConn(client)
-	bucket, _ := client.NewBucketType("maps", "config")
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	recordName := topicConfigRecordName(topic.Name)
 	topic.Config, _ = bucket.FetchMap(recordName)
 }

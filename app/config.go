@@ -52,6 +52,8 @@ func GetCoreConfig(config_file *string) (Config, error) {
 	}
 	cfg.RiakPool = InitRiakPool(cfg)
 	cfg.Queues = loadQueuesConfig(cfg)
+
+	go cfg.Queues.syncConfig(cfg)
 	return cfg, err
 }
 
@@ -67,20 +69,21 @@ func loadQueuesConfig(cfg Config) Queues {
 	// Get the bucket holding the map of config data
 	configBucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	// Fetch the object for holding the set of queues
-	queueConfig, _ := configBucket.FetchMap(QUEUE_CONFIG_NAME)
-	queueSet := queueConfig.AddSet(QUEUE_SET_NAME)
+	config, _ := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	queuesConfig.Config = config
+
+	queueSet := config.AddSet(QUEUE_SET_NAME)
 	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
 		// Convert it's name into a string
 		name := string(elem[:])
-		log.Print(name)
 		// Get the Riak RdtMap of settings for this queue
-		settingsMap, _ := configBucket.FetchMap(queueConfigRecordName(name))
+		configMap, _ := configBucket.FetchMap(queueConfigRecordName(name))
 		// Pre-warm the settings object
 		queue := Queue{
-			Name:     name,
-			Settings: settingsMap,
-			Parts:    InitPartitions(cfg, name),
+			Name:   name,
+			Config: configMap,
+			Parts:  InitPartitions(cfg, name),
 		}
 		// TODO: We should be handling errors here
 		// Set the queue in the queue map
@@ -93,7 +96,7 @@ func loadQueuesConfig(cfg Config) Queues {
 func (cfg Config) InitializeQueue(queueName string) error {
 	// Create the configuration data in Riak first
 	// This way it'll be there once the queue is added to the known set
-	settingsMap, err := cfg.createConfigForQueue(queueName)
+	configMap, err := cfg.createConfigForQueue(queueName)
 	if err != nil {
 		return err
 	}
@@ -101,9 +104,9 @@ func (cfg Config) InitializeQueue(queueName string) error {
 	err = cfg.addToKnownQueues(queueName)
 	// Now, add the queue into our memory-cache of data
 	cfg.Queues.QueueMap[queueName] = Queue{
-		Name:     queueName,
-		Parts:    InitPartitions(cfg, queueName),
-		Settings: settingsMap,
+		Name:   queueName,
+		Parts:  InitPartitions(cfg, queueName),
+		Config: configMap,
 	}
 	return err
 }
@@ -199,7 +202,7 @@ func (cfg Config) getQueueSetting(paramName string, queueName string) (string, e
 	// While we wait, go and read from Riak directly
 	if &cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
-			value = registerValueToString(cfg.Queues.QueueMap[queueName].Settings.FetchRegister(paramName))
+			value = registerValueToString(cfg.Queues.QueueMap[queueName].Config.FetchRegister(paramName))
 		}
 	}
 

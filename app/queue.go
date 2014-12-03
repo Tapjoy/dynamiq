@@ -13,6 +13,8 @@ import (
 type Queues struct {
 	// a container for all queues
 	QueueMap map[string]Queue
+	// Settings for Queues in general, ie queue list
+	Config *riak.RDtMap
 }
 
 type Queue struct {
@@ -22,8 +24,7 @@ type Queue struct {
 	// the partitions of the queue
 	Parts Partitions
 	// Individual settings for the queue
-	//Settings map[string]string
-	Settings *riak.RDtMap
+	Config *riak.RDtMap
 }
 
 // get a message from the queue
@@ -133,15 +134,66 @@ func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
 }
 
 func (queues Queues) syncConfig(cfg Config) {
-	log.Println("syncing Queue config with Riak")
-	//client := cfg.RiakConnection()
-	//bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-	//if err != nil {
-	//log.Println(err)
-	//}
+	for {
+		log.Println("syncing Queue config with Riak")
+		client := cfg.RiakConnection()
+		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+		if err != nil {
+			log.Println(err)
+		}
+		queues.Config, err = bucket.FetchMap(QUEUE_CONFIG_NAME)
+		if err != nil {
+			log.Println(err)
+		}
 
-	//for key := range cfg.Queues.QueueMap {
-	// For each known queue
+		//iterate the map and add or remove topics that need to be destroyed
+		queueSlice := queues.Config.FetchSet(QUEUE_SET_NAME).GetValue()
+		if queueSlice == nil {
+			//bail if there aren't any topics
+			//but not before sleeping
+			cfg.ReleaseRiakConnection(client)
+			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
+			continue
+		}
 
-	//}
+		//Is there a better way to do this?
+		//iterate over the queues in riak and add the missing ones
+		queuesToKeep := make(map[string]bool)
+		for _, queue := range queueSlice {
+			var present bool
+			_, present = queues.QueueMap[string(queue)]
+			if present != true {
+				// analog of topics.InitTopic
+			}
+			queuesToKeep[string(queue)] = true
+		}
+
+		//iterate over the topics in topics.TopicMap and delete the ones no longer used
+		for queue, _ := range queues.QueueMap {
+			var present bool
+			_, present = queuesToKeep[queue]
+			if present != true {
+				delete(queues.QueueMap, queue)
+			}
+		}
+
+		//sync all topics with riak
+
+		for _, queue := range queues.QueueMap {
+			queue.syncConfig(cfg)
+		}
+		//sleep for the configured interval
+		cfg.ReleaseRiakConnection(client)
+		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+	}
+}
+
+func (queue Queue) syncConfig(cfg Config) {
+	//refresh the queue RDtMap
+	client := cfg.RiakConnection()
+	defer cfg.ReleaseRiakConnection(client)
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	recordName := queueConfigRecordName(queue.Name)
+	queue.Config, _ = bucket.FetchMap(recordName)
+	cfg.Queues.QueueMap[queue.Name] = queue
 }
