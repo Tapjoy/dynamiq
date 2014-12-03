@@ -131,3 +131,17 @@ func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
 	log.Printf("Get Multi Took %s\n", elapsed)
 	return returnVals
 }
+
+func (queues Queues) syncConfig(cfg Config) {
+	log.Println("syncing Queue config with Riak")
+	//client := cfg.RiakConnection()
+	//bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	//if err != nil {
+	//log.Println(err)
+	//}
+
+	//for key := range cfg.Queues.QueueMap {
+	// For each known queue
+
+	//}
+}

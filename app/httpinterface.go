@@ -66,7 +66,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		if present != true {
 			topics.InitTopic(params["topic"])
 		}
-		topics.TopicMap[params["topic"]].AddQueue(params["queue"])
+		topics.TopicMap[params["topic"]].AddQueue(cfg, params["queue"])
 		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
 
@@ -77,7 +77,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		if present != true {
 			topics.InitTopic(params["topic"])
 		}
-		topics.TopicMap[params["topic"]].DeleteQueue(params["queue"])
+		topics.TopicMap[params["topic"]].DeleteQueue(cfg, params["queue"])
 		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
 

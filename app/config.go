@@ -15,8 +15,8 @@ var (
 )
 
 const CONFIGURATION_BUCKET = "config"
-const SET_BUCKET = "config_sets"
-const QUEUE_SET_NAME = "queues_list"
+const QUEUE_CONFIG_NAME = "queue_config"
+const QUEUE_SET_NAME = "queues"
 
 const VISIBILITY_TIMEOUT = "visibility_timeout"
 const PARTITION_COUNT = "partition_count"
@@ -55,10 +55,6 @@ func GetCoreConfig(config_file *string) (Config, error) {
 	return cfg, err
 }
 
-func queueConfigBucketName(queueName string) string {
-	return fmt.Sprintf("queue_%s_config", queueName)
-}
-
 func loadQueuesConfig(cfg Config) Queues {
 	// Create the Queues Config struct
 	queuesConfig := Queues{
@@ -68,20 +64,18 @@ func loadQueuesConfig(cfg Config) Queues {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 	// TODO: We should be handling errors here
-	// Get the bucket holding the sets of config data
-	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
-	// Fetch the object for holding the set of queues
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
-	// Get the bucket for holding maps of config data
+	// Get the bucket holding the map of config data
 	configBucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-	log.Print("Trying to load queue set")
+	// Fetch the object for holding the set of queues
+	queueConfig, _ := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	queueSet := queueConfig.AddSet(QUEUE_SET_NAME)
 	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
 		// Convert it's name into a string
 		name := string(elem[:])
 		log.Print(name)
 		// Get the Riak RdtMap of settings for this queue
-		settingsMap, _ := configBucket.FetchMap(queueConfigBucketName(name))
+		settingsMap, _ := configBucket.FetchMap(queueConfigRecordName(name))
 		// Pre-warm the settings object
 		queue := Queue{
 			Name:     name,
@@ -115,19 +109,23 @@ func (cfg Config) InitializeQueue(queueName string) error {
 }
 
 func (cfg Config) addToKnownQueues(queueName string) error {
+	// If we disallow topicless-queues, we can remove this and put it into Topic.AddQueue
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
-	bucket, _ := client.NewBucketType("sets", SET_BUCKET)
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	queueConfig, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	queueSet := queueConfig.AddSet(QUEUE_SET_NAME)
 	queueSet.Add([]byte(queueName))
-	return queueSet.Store()
+	return queueConfig.Store()
 }
 
 func (cfg Config) removeFromKnownQueues(queueName string) error {
+	// If we disallow topicless-queues, we can remove this and put it into Topic.RemoveQueue
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
-	bucket, _ := client.NewBucket(CONFIGURATION_BUCKET)
-	queueSet, _ := bucket.FetchSet(QUEUE_SET_NAME)
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	queueConfig, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	queueSet := queueConfig.AddSet(QUEUE_SET_NAME)
 	queueSet.Remove([]byte(queueName))
 	return queueSet.Store()
 }
@@ -140,7 +138,7 @@ func (cfg Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
 	// TODO: Find a nice way to DRY this up - it's a lil copy/pasty
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	// Get the object for this queues settings
-	obj, _ := bucket.FetchMap(queueConfigBucketName(queueName))
+	obj, _ := bucket.FetchMap(queueConfigRecordName(queueName))
 	// For each known setting
 	for _, elem := range SETTINGS {
 		// Get the reigster for this setting
@@ -211,7 +209,7 @@ func (cfg Config) getQueueSetting(paramName string, queueName string) (string, e
 		client := cfg.RiakConnection()
 		defer cfg.ReleaseRiakConnection(client)
 		bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-		obj, err := bucket.FetchMap(queueConfigBucketName(queueName))
+		obj, err := bucket.FetchMap(queueConfigRecordName(queueName))
 
 		// if not found... no config existed for that queue - should not happen hashtagcrossfingers
 		if err == riak.NotFound {
@@ -235,7 +233,7 @@ func (cfg Config) setQueueSetting(paramName string, queueName string, value stri
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-	obj, err := bucket.FetchMap(queueConfigBucketName(queueName))
+	obj, err := bucket.FetchMap(queueConfigRecordName(queueName))
 	// if not found... no config existed for that queue - should not happen hashtagcrossfingers
 	if err == riak.NotFound {
 		// Log out an error here
@@ -259,4 +257,8 @@ func (cfg Config) RiakConnection() *riak.Client {
 
 func (cfg Config) ReleaseRiakConnection(conn *riak.Client) {
 	cfg.RiakPool.PutConn(conn)
+}
+
+func queueConfigRecordName(queueName string) string {
+	return fmt.Sprintf("queue_%s_config", queueName)
 }
