@@ -57,10 +57,10 @@ getting started
 =========
 ```
 export GOPATH=`pwd`
-go get github.com/Tapjoy/riakQueue
+go get github.com/Tapjoy/RQS
 mkdir lib
-cp ./src/github.com/Tapjoy/riakQueue/lib/config.gcfg ./lib/config.gcfg
-./bin/riakQueue
+cp ./src/github.com/Tapjoy/RQS/lib/config.gcfg ./lib/config.gcfg
+./bin/RQS
 ```
 
 Implementation
