@@ -1,7 +1,7 @@
 package app_test
 
 import (
-	"github.com/Tapjoy/riakQueue/app"
+	"github.com/Tapjoy/RQS/app"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"strconv"

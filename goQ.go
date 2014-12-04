@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/Tapjoy/riakQueue/app"
+	"github.com/Tapjoy/RQS/app"
 	"log"
 )
 
