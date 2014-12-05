@@ -147,7 +147,16 @@ func (queues Queues) syncConfig(cfg Config) {
 		}
 
 		//iterate the map and add or remove topics that need to be destroyed
-		queueSlice := queues.Config.FetchSet(QUEUE_SET_NAME).GetValue()
+		queueSet := queues.Config.FetchSet(QUEUE_SET_NAME)
+
+		if queueSet == nil {
+			//bail if there aren't any topics
+			//but not before sleeping
+			cfg.ReleaseRiakConnection(client)
+			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
+			continue
+		}
+		queueSlice := queueSet.GetValue()
 		if queueSlice == nil {
 			//bail if there aren't any topics
 			//but not before sleeping
