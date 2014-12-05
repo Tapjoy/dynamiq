@@ -160,12 +160,13 @@ func (queues Queues) syncConfig(cfg Config) {
 		//iterate over the queues in riak and add the missing ones
 		queuesToKeep := make(map[string]bool)
 		for _, queue := range queueSlice {
+			queueName := string(queue)
 			var present bool
-			_, present = queues.QueueMap[string(queue)]
+			_, present = queues.QueueMap[queueName]
 			if present != true {
-				// analog of topics.InitTopic
+				initQueueFromRiak(cfg, queueName)
 			}
-			queuesToKeep[string(queue)] = true
+			queuesToKeep[queueName] = true
 		}
 
 		//iterate over the topics in topics.TopicMap and delete the ones no longer used
@@ -186,6 +187,22 @@ func (queues Queues) syncConfig(cfg Config) {
 		cfg.ReleaseRiakConnection(client)
 		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 	}
+}
+
+func initQueueFromRiak(cfg Config, queueName string) {
+	client := cfg.RiakConnection()
+	defer cfg.ReleaseRiakConnection(client)
+
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	config, _ := bucket.FetchMap(queueConfigRecordName(queueName))
+
+	queue := Queue{
+		Name:   queueName,
+		Parts:  InitPartitions(cfg, queueName),
+		Config: config,
+	}
+
+	cfg.Queues.QueueMap[queueName] = queue
 }
 
 func (queue Queue) syncConfig(cfg Config) {
