@@ -72,7 +72,13 @@ func loadQueuesConfig(cfg Config) Queues {
 	config, _ := configBucket.FetchMap(QUEUE_CONFIG_NAME)
 	queuesConfig.Config = config
 
+	// AddSet implicitly calls fetch set if the set already exists
 	queueSet := config.AddSet(QUEUE_SET_NAME)
+	if queueSet == nil {
+		queueSet.Add([]byte("default_queue"))
+		config.Store()
+		config, _ = configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	}
 	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
 		// Convert it's name into a string
