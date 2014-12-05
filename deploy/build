@@ -9,4 +9,4 @@ export GOPATH=`pwd`
 go get github.com/Tapjoy/RQS
 cd ..
 cp build/bin/RQS ./RQS
-rm -rf workspace app goQ.go README.md
+rm -rf build app goQ.go README.md 
