@@ -77,7 +77,7 @@ func loadQueuesConfig(cfg Config) Queues {
 		queueSet = config.AddSet(QUEUE_SET_NAME)
 		queueSet.Add([]byte("default_queue"))
 		config.Store()
-		config, _ := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+		config, _ = configBucket.FetchMap(QUEUE_CONFIG_NAME)
 	}
 	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
