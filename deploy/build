@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -x
+set -e
+
+mkdir build
+cd build
+export GOPATH=`pwd`
+go get github.com/Tapjoy/RQS
+cd ..
+cp build/bin/RQS ./RQS
+rm -rf build app goQ.go README.md 
