@@ -1,1 +1,1 @@
-rqs: ./RQS 
+dynamiq: ./dynamiq 

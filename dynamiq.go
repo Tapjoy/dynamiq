@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/Tapjoy/RQS/app"
+	"github.com/Tapjoy/dynamiq/app"
 	"log"
 )
 

@@ -1,7 +1,7 @@
 package app_test
 
 import (
-	"github.com/Tapjoy/RQS/app"
+	"github.com/Tapjoy/dynamiq/app"
 	"github.com/hashicorp/memberlist"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

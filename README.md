@@ -1,4 +1,4 @@
-RQS
+dynamiq
 =========
 
 A simple implimentation of a queue on top of riak
@@ -57,10 +57,10 @@ getting started
 =========
 ```
 export GOPATH=`pwd`
-go get github.com/Tapjoy/RQS
+go get github.com/Tapjoy/dynamiq
 mkdir lib
-cp ./src/github.com/Tapjoy/RQS/lib/config.gcfg ./lib/config.gcfg
-./bin/RQS
+cp ./src/github.com/Tapjoy/dynamiq/lib/config.gcfg ./lib/config.gcfg
+./bin/dynamiq
 ```
 
 Implementation
