@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
 	"log"
@@ -9,6 +11,14 @@ import (
 	"strconv"
 	"time"
 )
+
+// Define statistics keys suffixes
+
+const QUEUE_SENT_STATS_SUFFIX = ".sent"
+const QUEUE_RECEIVED_STATS_SUFFIX = ".received"
+const QUEUE_DELETED_STATS_SUFFIX = ".deleted"
+const QUEUE_DEPTH_STATS_SUFFIX = ".depth"
+const QUEUE_INFLIGHT_STATS_SUFFIX = ".inflight"
 
 type Queues struct {
 	// a container for all queues
@@ -25,6 +35,39 @@ type Queue struct {
 	Parts Partitions
 	// Individual settings for the queue
 	Config *riak.RDtMap
+}
+
+func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
+	// Increment # Sent
+	key := fmt.Sprintf("%s.%s", queueName, QUEUE_SENT_STATS_SUFFIX)
+	err := c.Incr(key, numberOfMessages)
+	// Increment Depth count
+	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
+	err = c.IncrGauge(key, numberOfMessages)
+	return err
+}
+
+func decrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
+	// Increment # Deleted
+	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DELETED_STATS_SUFFIX)
+	err := c.Incr(key, numberOfMessages)
+	// Decrement Inflight count
+	key = fmt.Sprintf("%s.%s", queueName, QUEUE_INFLIGHT_STATS_SUFFIX)
+	err = c.DecrGauge(key, numberOfMessages)
+	// Decrement Depth count
+	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
+	err = c.DecrGauge(key, numberOfMessages)
+	return err
+}
+
+func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
+	// Increment # Received
+	key := fmt.Sprintf("%s.%s", queueName, QUEUE_SENT_STATS_SUFFIX)
+	err := c.Incr(key, numberOfMessages)
+	// Increment Inflight count
+	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
+	err = c.IncrGauge(key, numberOfMessages)
+	return err
 }
 
 // get a message from the queue
@@ -50,7 +93,9 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 	if err != nil {
 		log.Printf("Error%v", err)
 	}
-	log.Println("Message retrieved ", len(messageIds))
+	messageCount := len(messageIds)
+	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, int64(messageCount))
+	log.Println("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
 }
 
@@ -70,6 +115,8 @@ func (queue Queue) Put(cfg Config, message string) string {
 		messageObj.Indexes["id_int"] = []string{uuid}
 		messageObj.Data = []byte(message)
 		messageObj.Store()
+
+		defer incrementMessageCount(cfg.Stats.Client, queue.Name, 1)
 		return uuid
 	} else {
 		//Actually want to handle this in some other way
@@ -86,6 +133,7 @@ func (queue Queue) Delete(cfg Config, id string) bool {
 		log.Println("Deleting: ", id)
 		err = bucket.Delete(id)
 		if err == nil {
+			defer incrementReceiveCount(cfg.Stats.Client, queue.Name, 1)
 			return true
 		}
 	}
@@ -93,6 +141,7 @@ func (queue Queue) Delete(cfg Config, id string) bool {
 		log.Println(err)
 	}
 	// if we got here we're borked
+	// TODO stats cleanup? Possibility that this gets us out of sync
 	return false
 }
 
