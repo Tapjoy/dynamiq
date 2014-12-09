@@ -6,7 +6,7 @@ set -e
 mkdir build
 cd build
 export GOPATH=`pwd`
-go get github.com/Tapjoy/RQS
+go get github.com/Tapjoy/dynamiq
 cd ..
-cp build/bin/RQS ./RQS
-rm -rf build app goQ.go README.md 
+cp build/bin/dynamiq ./dynamiq
+rm -rf build app dynamiq.go README.md 
