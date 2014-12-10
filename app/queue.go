@@ -70,6 +70,25 @@ func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessag
 	return err
 }
 
+func (queues Queues) Exists(cfg Config, queueName string) bool {
+	// For now, lets go right to Riak for this
+	// Because of the config delay, we don't wanna check the memory values
+	client := cfg.RiakConnection()
+	defer cfg.ReleaseRiakConnection(client)
+
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	m, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	set := m.AddSet(QUEUE_SET_NAME)
+
+	for _, value := range set.GetValue() {
+		log.Printf("Looking for %s, found %s", queueName, string(value[:]))
+		if string(value[:]) == queueName {
+			return true
+		}
+	}
+	return false
+}
+
 // get a message from the queue
 func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions

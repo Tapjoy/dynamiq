@@ -172,7 +172,6 @@ func (cfg Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
 		// Convert the default value to a bytearray, set it on the Register
 		reg.Update([]byte(DEFAULT_SETTINGS[elem]))
 	}
-	log.Print("Set that default config!")
 	// Save the object, returns an error up the callchain if needed
 	return obj, obj.Store()
 }
