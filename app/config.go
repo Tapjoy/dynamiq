@@ -22,10 +22,11 @@ const VISIBILITY_TIMEOUT = "visibility_timeout"
 const PARTITION_COUNT = "partition_count"
 const MIN_PARTITIONS = "min_partitions"
 const MAX_PARTITIONS = "max_partitions"
+const MAX_PARTITION_AGE = "max_partition_age"
 
 // Arrays and maps cannot be made immutable in golang
 var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, MAX_PARTITIONS}
-var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "50", MIN_PARTITIONS: "10", MAX_PARTITIONS: "100"}
+var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "50", MIN_PARTITIONS: "10", MAX_PARTITIONS: "100", MAX_PARTITION_AGE: "300"}
 
 type Config struct {
 	Core     Core
@@ -173,9 +174,8 @@ func (cfg Config) SetVisibilityTimeout(queueName string, timeout float64) error 
 }
 
 func (cfg Config) GetMinPartitions(queueName string) (int, error) {
-	val, err := cfg.getQueueSetting(MIN_PARTITIONS, queueName)
-	parsed, err := strconv.Atoi(val)
-	return parsed, err
+	val, _ := cfg.getQueueSetting(MIN_PARTITIONS, queueName)
+	return strconv.Atoi(val)
 }
 
 func (cfg Config) SetMinPartitions(queueName string, timeout int) error {
@@ -184,14 +184,20 @@ func (cfg Config) SetMinPartitions(queueName string, timeout int) error {
 }
 
 func (cfg Config) GetMaxPartitions(queueName string) (int, error) {
-	val, err := cfg.getQueueSetting(MAX_PARTITIONS, queueName)
-	parsed, err := strconv.Atoi(val)
-	return parsed, err
+	val, _ := cfg.getQueueSetting(MAX_PARTITIONS, queueName)
+	return strconv.Atoi(val)
 }
 
 func (cfg Config) SetMaxPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
 	return cfg.setQueueSetting(MAX_PARTITIONS, queueName, strconv.Itoa(timeout))
+}
+func (cfg Config) SetMaxPartitionAge(queueName string, age float64) error {
+	return cfg.setQueueSetting(MAX_PARTITION_AGE, queueName, strconv.FormatFloat(age, 'f', -1, 64))
+}
+func (cfg Config) GetMaxPartitionAge(queueName string) (float64, error) {
+	val, _ := cfg.getQueueSetting(MAX_PARTITION_AGE, queueName)
+	return strconv.ParseFloat(val, 32)
 }
 
 // TODO Find a proper way to scope this to a queue VS a topic

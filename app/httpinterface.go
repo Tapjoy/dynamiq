@@ -20,6 +20,7 @@ type ConfigRequest struct {
 	VisibilityTimeout *float64 `json:"visibility_timeout,omitempty"`
 	MinPartitions     *int     `json:"min_partitions,omitempty"`
 	MaxPartitions     *int     `json:"max_partitions,omitempty"`
+	MaxPartitionAge   *float64 `json:"max_partition_age,omitempty"`
 }
 
 // TODO make message definitions more explicit
@@ -115,6 +116,14 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 
 		if configRequest.MaxPartitions != nil {
 			err = cfg.SetMaxPartitions(params["queue"], *configRequest.MaxPartitions)
+			if err != nil {
+				log.Println(err)
+				r.JSON(500, map[string]interface{}{"error": err.Error()})
+				return
+			}
+		}
+		if configRequest.MaxPartitionAge != nil {
+			err = cfg.SetMaxPartitionAge(params["queue"], *configRequest.MaxPartitionAge)
 			if err != nil {
 				log.Println(err)
 				r.JSON(500, map[string]interface{}{"error": err.Error()})

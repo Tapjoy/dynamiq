@@ -222,4 +222,5 @@ func (queue Queue) syncConfig(cfg Config) {
 	recordName := queueConfigRecordName(queue.Name)
 	queue.Config, _ = bucket.FetchMap(recordName)
 	cfg.Queues.QueueMap[queue.Name] = queue
+	queue.Parts.syncPartitions(cfg, queue.Name)
 }
