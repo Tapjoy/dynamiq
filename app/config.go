@@ -47,11 +47,12 @@ type Core struct {
 }
 
 type Stats struct {
-	Type          string
-	FlushInterval int
-	Address       string
-	Prefix        string
-	Client        stats.StatsClient
+	Type                 string
+	FlushInterval        int
+	Address              string
+	Prefix               string
+	Client               stats.StatsClient
+	InternalStatsdServer bool
 }
 
 func GetCoreConfig(config_file *string) (Config, error) {
@@ -64,9 +65,6 @@ func GetCoreConfig(config_file *string) (Config, error) {
 	cfg.Queues = loadQueuesConfig(cfg)
 	switch cfg.Stats.Type {
 	case "statsd":
-		cfg.Stats.Client = stats.NewStatsdClient(cfg.Stats.Address, cfg.Stats.Prefix, time.Second*time.Duration(cfg.Stats.FlushInterval))
-	case "statsdinternal":
-		// Start internal server first
 		cfg.Stats.Client = stats.NewStatsdClient(cfg.Stats.Address, cfg.Stats.Prefix, time.Second*time.Duration(cfg.Stats.FlushInterval))
 	default:
 		cfg.Stats.Client = stats.NewNOOPClient()
