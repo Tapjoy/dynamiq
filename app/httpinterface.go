@@ -210,7 +210,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 		}
 	})
 
-	m.Put("/queues/:queue/messages", func(params martini.Params, req *http.Request) string {
+	m.Put("/queues/:queue/message", func(params martini.Params, req *http.Request) string {
 		var present bool
 		_, present = queues.QueueMap[params["queue"]]
 		if present == true {
