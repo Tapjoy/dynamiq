@@ -8,8 +8,8 @@ import (
 type StatsClient interface {
 	Incr(id string, value int64) error
 	Decr(id string, value int64) error
-	IncrGauge(id string, value int64) error
-	DecrGauge(id string, value int64) error
+	IncrTimer(id string, value int64) error
+	DecrTimer(id string, value int64) error
 }
 
 // This client will report stats to a StatsD compatible service
@@ -40,12 +40,12 @@ func (c StatsdClient) Decr(id string, value int64) error {
 	return c.client.Decr(id, value)
 }
 
-func (c StatsdClient) IncrGauge(id string, value int64) error {
-	return c.client.Gauge(id, value)
+func (c StatsdClient) IncrTimer(id string, value int64) error {
+	return c.client.Timing(id, value)
 }
 
-func (c StatsdClient) DecrGauge(id string, value int64) error {
-	return c.client.Gauge(id, -value)
+func (c StatsdClient) DecrTimer(id string, value int64) error {
+	return c.client.Timing(id, -value)
 }
 
 // This client is to sub in when we don't want to write stats
@@ -64,10 +64,10 @@ func (c NOOPClient) Decr(id string, value int64) error {
 	return nil
 }
 
-func (c NOOPClient) IncrGauge(id string, value int64) error {
+func (c NOOPClient) IncrTimer(id string, value int64) error {
 	return nil
 }
 
-func (c NOOPClient) DecrGauge(id string, value int64) error {
+func (c NOOPClient) DecrTimer(id string, value int64) error {
 	return nil
 }

@@ -43,7 +43,7 @@ func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessag
 	err := c.Incr(key, numberOfMessages)
 	// Increment Depth count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
-	err = c.IncrGauge(key, numberOfMessages)
+	err = c.IncrTimer(key, numberOfMessages)
 	return err
 }
 
@@ -53,10 +53,10 @@ func decrementMessageCount(c stats.StatsClient, queueName string, numberOfMessag
 	err := c.Incr(key, numberOfMessages)
 	// Decrement Inflight count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_INFLIGHT_STATS_SUFFIX)
-	err = c.DecrGauge(key, numberOfMessages)
+	err = c.DecrTimer(key, numberOfMessages)
 	// Decrement Depth count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
-	err = c.DecrGauge(key, numberOfMessages)
+	err = c.DecrTimer(key, numberOfMessages)
 	return err
 }
 
@@ -66,7 +66,7 @@ func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessag
 	err := c.Incr(key, numberOfMessages)
 	// Increment Inflight count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
-	err = c.IncrGauge(key, numberOfMessages)
+	err = c.IncrTimer(key, numberOfMessages)
 	return err
 }
 
