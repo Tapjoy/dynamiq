@@ -91,6 +91,7 @@ func (topic *Topic) Broadcast(cfg Config, message string) map[string]string {
 	return queueWrites
 }
 
+// For the time being, this will also initialize the queue new if it does not exist
 func (topic *Topic) AddQueue(cfg Config, name string) {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
@@ -107,9 +108,13 @@ func (topic *Topic) AddQueue(cfg Config, name string) {
 		log.Println(err)
 	}
 
-	err = cfg.InitializeQueue(name)
-	if err != nil {
-		log.Println(err)
+	// Temporary hack to keep the api consistent
+	// Only configure it new if it is a new queue. Otherwise, leave it alone
+	if !cfg.Queues.Exists(cfg, name) {
+		err = cfg.InitializeQueue(name)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 }
 
@@ -156,6 +161,7 @@ func (topics Topics) DeleteTopic(name string) bool {
 		return true
 	}
 }
+
 func (topic *Topic) Delete() {
 	client := topic.riakPool.GetConn()
 	defer topic.riakPool.PutConn(client)

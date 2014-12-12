@@ -7,4 +7,9 @@
  riaknodes="127.0.0.1:8087"
  backendconnectionpool=16
  syncconfiginterval=10000
-
+[stats]
+ type=statsd #(statsd|statsdinternal|none)
+ flushinterval=2 #number of seconds to hold data in memory before flushing
+ address="127.0.0.1:8125"
+ prefix="dynamiq." # prefix to use to not trample over other data
+ internalstatsdserver=false #set to false to disable running a server internally

@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/gcfg"
 	"errors"
 	"fmt"
+	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/tpjg/goriakpbc"
 	"log"
 	"strconv"
@@ -30,6 +31,7 @@ var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COU
 
 type Config struct {
 	Core     Core
+	Stats    Stats
 	Queues   Queues
 	RiakPool RiakPool
 }
@@ -45,6 +47,15 @@ type Core struct {
 	SyncConfigInterval    time.Duration
 }
 
+type Stats struct {
+	Type                 string
+	FlushInterval        int
+	Address              string
+	Prefix               string
+	Client               stats.StatsClient
+	InternalStatsdServer bool
+}
+
 func GetCoreConfig(config_file *string) (Config, error) {
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, *config_file)
@@ -53,6 +64,12 @@ func GetCoreConfig(config_file *string) (Config, error) {
 	}
 	cfg.RiakPool = InitRiakPool(cfg)
 	cfg.Queues = loadQueuesConfig(cfg)
+	switch cfg.Stats.Type {
+	case "statsd":
+		cfg.Stats.Client = stats.NewStatsdClient(cfg.Stats.Address, cfg.Stats.Prefix, time.Second*time.Duration(cfg.Stats.FlushInterval))
+	default:
+		cfg.Stats.Client = stats.NewNOOPClient()
+	}
 
 	go cfg.Queues.syncConfig(cfg)
 	return cfg, err
@@ -156,7 +173,6 @@ func (cfg Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
 		// Convert the default value to a bytearray, set it on the Register
 		reg.Update([]byte(DEFAULT_SETTINGS[elem]))
 	}
-	log.Print("Set that default config!")
 	// Save the object, returns an error up the callchain if needed
 	return obj, obj.Store()
 }
