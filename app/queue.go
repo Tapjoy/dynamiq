@@ -147,7 +147,7 @@ func (queues Queues) syncConfig(cfg Config) {
 		}
 
 		//iterate the map and add or remove topics that need to be destroyed
-		queueSet := queues.Config.FetchSet(QUEUE_SET_NAME)
+		queueSet := queues.Config.AddSet(QUEUE_SET_NAME)
 
 		if queueSet == nil {
 			//bail if there aren't any topics
@@ -222,5 +222,6 @@ func (queue Queue) syncConfig(cfg Config) {
 	recordName := queueConfigRecordName(queue.Name)
 	queue.Config, _ = bucket.FetchMap(recordName)
 	cfg.Queues.QueueMap[queue.Name] = queue
+	log.Println("syncing Partitions")
 	queue.Parts.syncPartitions(cfg, queue.Name)
 }

@@ -14,8 +14,7 @@ import (
 )
 
 type Partitions struct {
-	partitions     *lane.PQueue
-	partitionCount int
+	partitions *lane.PQueue
 	sync.RWMutex
 }
 
@@ -35,12 +34,8 @@ func InitPartitions(cfg Config, queueName string) Partitions {
 }
 
 func (part Partitions) PartitionCount() int {
-	return part.partitionCount
+	return part.partitions.Size()
 }
-func (part Partitions) incrPartitionCount(partsToAdd int) {
-	part.partitionCount = part.partitionCount + partsToAdd
-}
-
 func (part Partitions) GetPartition(cfg Config, queueName string, list *memberlist.Memberlist) (int, int, error) {
 
 	//get the node position and the node count
@@ -95,7 +90,8 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 
 	//TODO move loging out of the sync operation for better throughput
 	myPartition := -1
-	log.Println("totalPartitions:" + strconv.Itoa(part.partitionCount))
+	totalPartitions := part.partitions.Size()
+	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
 
 	var err error
 	poppedPartition, _ := part.partitions.Pop()
@@ -103,7 +99,7 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 	if poppedPartition != nil {
 		workingPartition = poppedPartition.(*Partition)
 	} else {
-		return myPartition, part.partitionCount, errors.New("no available partitions")
+		return myPartition, totalPartitions, errors.New("no available partitions")
 	}
 	log.Println("partition: " + strconv.Itoa(workingPartition.Id) + " occupied time: " + strconv.FormatFloat(time.Since(workingPartition.LastUsed).Seconds(), 'f', -1, 64))
 	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
@@ -115,10 +111,9 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 		part.Lock()
 		maxPartitions, _ := cfg.GetMaxPartitions(queueName)
-		if part.partitionCount < maxPartitions {
-			part.incrPartitionCount(1)
+		if totalPartitions < maxPartitions {
 			workingPartition := new(Partition)
-			workingPartition.Id = part.partitionCount
+			workingPartition.Id = totalPartitions
 			workingPartition.LastUsed = time.Now()
 			myPartition = workingPartition.Id
 			part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
@@ -127,42 +122,41 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 		}
 		part.Unlock()
 	}
-	log.Println("totalPartitions:" + strconv.Itoa(part.partitionCount))
-	return myPartition, part.partitionCount, err
+	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
+	return myPartition, totalPartitions, err
 }
 
 func (part Partitions) makePartitions(cfg Config, queueName string, partitionsToMake int) {
-	part.Lock()
-	defer part.Unlock()
 	var initialTime time.Time
-	offset := part.partitionCount
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
+	totalPartitions := part.partitions.Size()
+	offset := totalPartitions
 	for partitionId := offset; partitionId < offset+partitionsToMake; partitionId++ {
 		if maxPartitions > partitionId {
-			part.incrPartitionCount(1)
 			partition := new(Partition)
 			partition.Id = partitionId
 			partition.LastUsed = initialTime
 			part.partitions.Push(partition, rand.Int63n(100000))
 		}
 	}
+	log.Println("made " + strconv.Itoa(partitionsToMake))
+	log.Println(strconv.Itoa(part.PartitionCount()))
 }
 func (part Partitions) syncPartitions(cfg Config, queueName string) {
-	part.Lock()
+	log.Println("syncing Partitions")
 
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)
 	maxPartitionAge, _ := cfg.GetMaxPartitionAge(queueName)
+	totalPartitions := part.partitions.Size()
 	var partsRemoved int
-	for partsRemoved = 0; maxPartitions < part.partitionCount; partsRemoved++ {
+	for partsRemoved = 0; maxPartitions < totalPartitions; partsRemoved++ {
 		_, _ = part.partitions.Pop()
-		part.incrPartitionCount(-1)
 	}
 	log.Println("removed " + strconv.Itoa(partsRemoved) + " from queue " + queueName)
-	part.Unlock()
 
-	if part.partitionCount < minPartitions {
-		part.makePartitions(cfg, queueName, minPartitions-part.partitionCount)
+	if part.partitions.Size() < minPartitions {
+		part.makePartitions(cfg, queueName, minPartitions-totalPartitions)
 	}
 
 	poppedPartition, _ := part.partitions.Pop()
@@ -172,9 +166,6 @@ func (part Partitions) syncPartitions(cfg Config, queueName string) {
 		workingPartition = poppedPartition.(*Partition)
 	}
 	if time.Since(workingPartition.LastUsed).Seconds() > maxPartitionAge {
-		part.Lock()
-		part.incrPartitionCount(-1)
-		part.Unlock()
 	} else {
 		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 	}
