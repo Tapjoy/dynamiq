@@ -14,11 +14,11 @@ import (
 
 // Define statistics keys suffixes
 
-const QUEUE_SENT_STATS_SUFFIX = ".sent"
-const QUEUE_RECEIVED_STATS_SUFFIX = ".received"
-const QUEUE_DELETED_STATS_SUFFIX = ".deleted"
-const QUEUE_DEPTH_STATS_SUFFIX = ".depth"
-const QUEUE_INFLIGHT_STATS_SUFFIX = ".inflight"
+const QUEUE_SENT_STATS_SUFFIX = "sent.count"
+const QUEUE_RECEIVED_STATS_SUFFIX = "received.count"
+const QUEUE_DELETED_STATS_SUFFIX = "deleted.count"
+const QUEUE_DEPTH_STATS_SUFFIX = "depth.count"
+const QUEUE_INFLIGHT_STATS_SUFFIX = "inflight.count"
 
 type Queues struct {
 	// a container for all queues
@@ -43,7 +43,7 @@ func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessag
 	err := c.Incr(key, numberOfMessages)
 	// Increment Depth count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
-	err = c.IncrTimer(key, numberOfMessages)
+	err = c.IncrGauge(key, numberOfMessages)
 	return err
 }
 
@@ -53,20 +53,20 @@ func decrementMessageCount(c stats.StatsClient, queueName string, numberOfMessag
 	err := c.Incr(key, numberOfMessages)
 	// Decrement Inflight count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_INFLIGHT_STATS_SUFFIX)
-	err = c.DecrTimer(key, numberOfMessages)
+	err = c.DecrGauge(key, numberOfMessages)
 	// Decrement Depth count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
-	err = c.DecrTimer(key, numberOfMessages)
+	err = c.DecrGauge(key, numberOfMessages)
 	return err
 }
 
 func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
 	// Increment # Received
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_SENT_STATS_SUFFIX)
+	key := fmt.Sprintf("%s.%s", queueName, QUEUE_RECEIVED_STATS_SUFFIX)
 	err := c.Incr(key, numberOfMessages)
 	// Increment Inflight count
-	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
-	err = c.IncrTimer(key, numberOfMessages)
+	key = fmt.Sprintf("%s.%s", queueName, QUEUE_INFLIGHT_STATS_SUFFIX)
+	err = c.IncrGauge(key, numberOfMessages)
 	return err
 }
 
@@ -152,7 +152,7 @@ func (queue Queue) Delete(cfg Config, id string) bool {
 		log.Println("Deleting: ", id)
 		err = bucket.Delete(id)
 		if err == nil {
-			defer incrementReceiveCount(cfg.Stats.Client, queue.Name, 1)
+			defer decrementMessageCount(cfg.Stats.Client, queue.Name, 1)
 			return true
 		}
 	}

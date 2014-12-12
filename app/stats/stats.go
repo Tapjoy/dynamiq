@@ -8,17 +8,16 @@ import (
 type StatsClient interface {
 	Incr(id string, value int64) error
 	Decr(id string, value int64) error
-	IncrTimer(id string, value int64) error
-	DecrTimer(id string, value int64) error
+	IncrGauge(id string, value int64) error
+	DecrGauge(id string, value int64) error
 }
 
 // This client will report stats to a StatsD compatible service
 type StatsdClient struct {
-	prefix           string
-	address          string
-	unbufferedClient *statsd.StatsdClient
-	interval         time.Duration
-	client           *statsd.StatsdBuffer
+	prefix   string
+	address  string
+	client   *statsd.StatsdClient
+	interval time.Duration
 }
 
 func NewStatsdClient(address string, prefix string, interval time.Duration) StatsdClient {
@@ -27,8 +26,8 @@ func NewStatsdClient(address string, prefix string, interval time.Duration) Stat
 		interval: interval,
 		address:  address,
 	}
-	client.unbufferedClient = statsd.NewStatsdClient(address, prefix)
-	client.client = statsd.NewStatsdBuffer(interval, client.unbufferedClient)
+	client.client = statsd.NewStatsdClient(address, prefix)
+	client.client.CreateSocket()
 	return client
 }
 
@@ -40,12 +39,12 @@ func (c StatsdClient) Decr(id string, value int64) error {
 	return c.client.Decr(id, value)
 }
 
-func (c StatsdClient) IncrTimer(id string, value int64) error {
-	return c.client.Timing(id, value)
+func (c StatsdClient) IncrGauge(id string, value int64) error {
+	return c.client.GaugeDelta(id, value)
 }
 
-func (c StatsdClient) DecrTimer(id string, value int64) error {
-	return c.client.Timing(id, -value)
+func (c StatsdClient) DecrGauge(id string, value int64) error {
+	return c.client.GaugeDelta(id, -value)
 }
 
 // This client is to sub in when we don't want to write stats
@@ -64,10 +63,10 @@ func (c NOOPClient) Decr(id string, value int64) error {
 	return nil
 }
 
-func (c NOOPClient) IncrTimer(id string, value int64) error {
+func (c NOOPClient) IncrGauge(id string, value int64) error {
 	return nil
 }
 
-func (c NOOPClient) DecrTimer(id string, value int64) error {
+func (c NOOPClient) DecrGauge(id string, value int64) error {
 	return nil
 }
