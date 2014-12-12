@@ -179,6 +179,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg Config) {
 			queueReturn["visibility_timeout"], _ = cfg.GetVisibilityTimeout(params["queue"])
 			queueReturn["min_partitions"], _ = cfg.GetMinPartitions(params["queue"])
 			queueReturn["max_partitions"], _ = cfg.GetMaxPartitions(params["queue"])
+			queueReturn["max_partition_age"], _ = cfg.GetMaxPartitionAge(params["queue"])
 			queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 			r.JSON(200, queueReturn)
 		} else {

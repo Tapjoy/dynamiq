@@ -25,7 +25,7 @@ const MAX_PARTITIONS = "max_partitions"
 const MAX_PARTITION_AGE = "max_partition_age"
 
 // Arrays and maps cannot be made immutable in golang
-var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, MAX_PARTITIONS}
+var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, MAX_PARTITIONS, MAX_PARTITION_AGE}
 var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "50", MIN_PARTITIONS: "10", MAX_PARTITIONS: "100", MAX_PARTITION_AGE: "300"}
 
 type Config struct {

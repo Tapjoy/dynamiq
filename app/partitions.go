@@ -152,6 +152,7 @@ func (part Partitions) syncPartitions(cfg Config, queueName string) {
 	var partsRemoved int
 	for partsRemoved = 0; maxPartitions < totalPartitions; partsRemoved++ {
 		_, _ = part.partitions.Pop()
+		totalPartitions = totalPartitions - 1
 	}
 	log.Println("removed " + strconv.Itoa(partsRemoved) + " from queue " + queueName)
 
@@ -159,14 +160,23 @@ func (part Partitions) syncPartitions(cfg Config, queueName string) {
 		part.makePartitions(cfg, queueName, minPartitions-totalPartitions)
 	}
 
-	poppedPartition, _ := part.partitions.Pop()
-
+	// Partition Aging logic
+	// pop a partition
 	var workingPartition *Partition
+	poppedPartition, _ := part.partitions.Pop()
 	if poppedPartition != nil {
 		workingPartition = poppedPartition.(*Partition)
 	}
-	if time.Since(workingPartition.LastUsed).Seconds() > maxPartitionAge {
-	} else {
-		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
+
+	// check if the partition is older than the max age ( but not a fresh partition )
+	// if true pop the next partition, continue until this condition
+	for time.Since(workingPartition.LastUsed).Seconds() > maxPartitionAge && part.partitions.Size() >= minPartitions {
+		poppedPartition, _ = part.partitions.Pop()
+		if poppedPartition != nil {
+			workingPartition = poppedPartition.(*Partition)
+		}
 	}
+	//when false push the last popped partition
+	part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
+
 }
