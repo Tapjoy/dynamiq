@@ -36,7 +36,6 @@ func InitPartitions(cfg Config, queueName string) Partitions {
 func (part Partitions) PartitionCount() int {
 	return part.partitions.Size()
 }
-
 func (part Partitions) GetPartition(cfg Config, queueName string, list *memberlist.Memberlist) (int, int, error) {
 
 	//get the node position and the node count
@@ -97,13 +96,10 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 	var err error
 	poppedPartition, _ := part.partitions.Pop()
 	var workingPartition *Partition
-	if poppedPartition == nil {
-		var lastUsed time.Time
-		workingPartition = new(Partition)
-		workingPartition.Id = 0
-		workingPartition.LastUsed = lastUsed
-	} else {
+	if poppedPartition != nil {
 		workingPartition = poppedPartition.(*Partition)
+	} else {
+		return myPartition, totalPartitions, errors.New("no available partitions")
 	}
 	log.Println("partition: " + strconv.Itoa(workingPartition.Id) + " occupied time: " + strconv.FormatFloat(time.Since(workingPartition.LastUsed).Seconds(), 'f', -1, 64))
 	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
@@ -115,9 +111,9 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 		part.Lock()
 		maxPartitions, _ := cfg.GetMaxPartitions(queueName)
-		if part.partitions.Size() < maxPartitions {
+		if totalPartitions < maxPartitions {
 			workingPartition := new(Partition)
-			workingPartition.Id = part.partitions.Size()
+			workingPartition.Id = totalPartitions
 			workingPartition.LastUsed = time.Now()
 			myPartition = workingPartition.Id
 			part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
@@ -127,15 +123,14 @@ func (part Partitions) getPartitionPosition(cfg Config, queueName string) (int, 
 		part.Unlock()
 	}
 	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
-	return myPartition, part.partitions.Size(), err
+	return myPartition, totalPartitions, err
 }
 
 func (part Partitions) makePartitions(cfg Config, queueName string, partitionsToMake int) {
-	part.Lock()
-	defer part.Unlock()
 	var initialTime time.Time
-	offset := part.partitions.Size()
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
+	totalPartitions := part.partitions.Size()
+	offset := totalPartitions
 	for partitionId := offset; partitionId < offset+partitionsToMake; partitionId++ {
 		if maxPartitions > partitionId {
 			partition := new(Partition)
@@ -144,4 +139,44 @@ func (part Partitions) makePartitions(cfg Config, queueName string, partitionsTo
 			part.partitions.Push(partition, rand.Int63n(100000))
 		}
 	}
+	log.Println("made " + strconv.Itoa(partitionsToMake))
+	log.Println(strconv.Itoa(part.PartitionCount()))
+}
+func (part Partitions) syncPartitions(cfg Config, queueName string) {
+	log.Println("syncing Partitions")
+
+	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
+	minPartitions, _ := cfg.GetMinPartitions(queueName)
+	maxPartitionAge, _ := cfg.GetMaxPartitionAge(queueName)
+	totalPartitions := part.partitions.Size()
+	var partsRemoved int
+	for partsRemoved = 0; maxPartitions < totalPartitions; partsRemoved++ {
+		_, _ = part.partitions.Pop()
+		totalPartitions = totalPartitions - 1
+	}
+	log.Println("removed " + strconv.Itoa(partsRemoved) + " from queue " + queueName)
+
+	if part.partitions.Size() < minPartitions {
+		part.makePartitions(cfg, queueName, minPartitions-totalPartitions)
+	}
+
+	// Partition Aging logic
+	// pop a partition
+	var workingPartition *Partition
+	poppedPartition, _ := part.partitions.Pop()
+	if poppedPartition != nil {
+		workingPartition = poppedPartition.(*Partition)
+	}
+
+	// check if the partition is older than the max age ( but not a fresh partition )
+	// if true pop the next partition, continue until this condition
+	for time.Since(workingPartition.LastUsed).Seconds() > maxPartitionAge && part.partitions.Size() >= minPartitions {
+		poppedPartition, _ = part.partitions.Pop()
+		if poppedPartition != nil {
+			workingPartition = poppedPartition.(*Partition)
+		}
+	}
+	//when false push the last popped partition
+	part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
+
 }
