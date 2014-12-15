@@ -73,9 +73,23 @@ func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessag
 func (queue Queue) setQueueAvailable(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
 	// set  depth
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_AVAILABLE_STATS_SUFFIX)
-	// do dumb thing to make sure we work
+	// find the difference between the first messages id and the last messages id
+
+	first, _ := strconv.ParseInt(ids[0], 10, 64)
+	last, _ := strconv.ParseInt(ids[len(ids)-1], 10, 64)
+	difference := last - first
+	//find the density of messages
+	density := float64(len(ids)) / float64(difference)
+	// find the total count of messages
+	count := density * math.MaxInt64
+
+	// for small queues where we only return 1 message guesstimate ( or should we return 0? )
 	multiplier := queue.Parts.PartitionCount() * len(list.Members())
-	return c.SetGauge(key, int64(len(ids)*multiplier))
+	if len(ids) == 1 {
+		return c.SetGauge(key, int64(len(ids)*multiplier))
+	} else {
+		return c.SetGauge(key, int64(count))
+	}
 }
 
 func (queues Queues) Exists(cfg Config, queueName string) bool {
