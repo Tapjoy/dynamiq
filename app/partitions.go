@@ -139,11 +139,8 @@ func (part Partitions) makePartitions(cfg Config, queueName string, partitionsTo
 			part.partitions.Push(partition, rand.Int63n(100000))
 		}
 	}
-	log.Println("made " + strconv.Itoa(partitionsToMake))
-	log.Println(strconv.Itoa(part.PartitionCount()))
 }
 func (part Partitions) syncPartitions(cfg Config, queueName string) {
-	log.Println("syncing Partitions")
 
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)
@@ -154,7 +151,7 @@ func (part Partitions) syncPartitions(cfg Config, queueName string) {
 		_, _ = part.partitions.Pop()
 		totalPartitions = totalPartitions - 1
 	}
-	log.Println("removed " + strconv.Itoa(partsRemoved) + " from queue " + queueName)
+	log.Println("removed " + strconv.Itoa(partsRemoved) + "partitions from queue " + queueName)
 
 	if part.partitions.Size() < minPartitions {
 		part.makePartitions(cfg, queueName, minPartitions-totalPartitions)

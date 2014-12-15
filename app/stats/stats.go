@@ -10,6 +10,7 @@ type StatsClient interface {
 	Decr(id string, value int64) error
 	IncrGauge(id string, value int64) error
 	DecrGauge(id string, value int64) error
+	SetGauge(id string, value int64) error
 }
 
 // This client will report stats to a StatsD compatible service
@@ -47,6 +48,10 @@ func (c StatsdClient) DecrGauge(id string, value int64) error {
 	return c.client.GaugeDelta(id, -value)
 }
 
+func (c StatsdClient) SetGauge(id string, value int64) error {
+	return c.client.Gauge(id, value)
+}
+
 // This client is to sub in when we don't want to write stats
 type NOOPClient struct {
 }
@@ -68,5 +73,9 @@ func (c NOOPClient) IncrGauge(id string, value int64) error {
 }
 
 func (c NOOPClient) DecrGauge(id string, value int64) error {
+	return nil
+}
+
+func (c NOOPClient) SetGauge(id string, value int64) error {
 	return nil
 }
