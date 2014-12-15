@@ -139,7 +139,6 @@ func (part Partitions) makePartitions(cfg Config, queueName string, partitionsTo
 			part.partitions.Push(partition, rand.Int63n(100000))
 		}
 	}
-	log.Println(strconv.Itoa(part.PartitionCount()))
 }
 func (part Partitions) syncPartitions(cfg Config, queueName string) {
 
