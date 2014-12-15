@@ -92,7 +92,7 @@ func (queue Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Member
 	}
 }
 
-func (queues Queues) Exists(cfg Config, queueName string) bool {
+func (queues Queues) Exists(cfg *Config, queueName string) bool {
 	// For now, lets go right to Riak for this
 	// Because of the config delay, we don't wanna check the memory values
 	client := cfg.RiakConnection()
@@ -112,7 +112,7 @@ func (queues Queues) Exists(cfg Config, queueName string) bool {
 }
 
 // get a message from the queue
-func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
+func (queue Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions
 	partBottom, partTop, err := queue.Parts.GetPartition(cfg, queue.Name, list)
 
@@ -142,7 +142,7 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 }
 
 // Put a Message onto the queue
-func (queue Queue) Put(cfg Config, message string) string {
+func (queue Queue) Put(cfg *Config, message string) string {
 	//Grab our bucket
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
@@ -167,7 +167,7 @@ func (queue Queue) Put(cfg Config, message string) string {
 }
 
 // Delete a Message from the queue
-func (queue Queue) Delete(cfg Config, id string) bool {
+func (queue Queue) Delete(cfg *Config, id string) bool {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucket(queue.Name)
@@ -188,7 +188,7 @@ func (queue Queue) Delete(cfg Config, id string) bool {
 }
 
 // helpers
-func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
+func (queue Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rObjectArrayChan = make(chan []riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
@@ -224,7 +224,7 @@ func (queue Queue) RetrieveMessages(ids []string, cfg Config) []riak.RObject {
 	return returnVals
 }
 
-func (queues Queues) syncConfig(cfg Config) {
+func (queues Queues) syncConfig(cfg *Config) {
 	for {
 		log.Println("syncing Queue config with Riak")
 		client := cfg.RiakConnection()
@@ -289,7 +289,7 @@ func (queues Queues) syncConfig(cfg Config) {
 	}
 }
 
-func initQueueFromRiak(cfg Config, queueName string) {
+func initQueueFromRiak(cfg *Config, queueName string) {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 
@@ -305,7 +305,7 @@ func initQueueFromRiak(cfg Config, queueName string) {
 	cfg.Queues.QueueMap[queueName] = queue
 }
 
-func (queue Queue) syncConfig(cfg Config) {
+func (queue Queue) syncConfig(cfg *Config) {
 	//refresh the queue RDtMap
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)

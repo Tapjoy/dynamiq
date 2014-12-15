@@ -56,14 +56,14 @@ type Stats struct {
 	InternalStatsdServer bool
 }
 
-func GetCoreConfig(config_file *string) (Config, error) {
+func GetCoreConfig(config_file *string) (*Config, error) {
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, *config_file)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.RiakPool = InitRiakPool(cfg)
-	cfg.Queues = loadQueuesConfig(cfg)
+	cfg.RiakPool = InitRiakPool(&cfg)
+	cfg.Queues = loadQueuesConfig(&cfg)
 	switch cfg.Stats.Type {
 	case "statsd":
 		cfg.Stats.Client = stats.NewStatsdClient(cfg.Stats.Address, cfg.Stats.Prefix, time.Second*time.Duration(cfg.Stats.FlushInterval))
@@ -71,11 +71,11 @@ func GetCoreConfig(config_file *string) (Config, error) {
 		cfg.Stats.Client = stats.NewNOOPClient()
 	}
 
-	go cfg.Queues.syncConfig(cfg)
-	return cfg, err
+	go cfg.Queues.syncConfig(&cfg)
+	return &cfg, err
 }
 
-func loadQueuesConfig(cfg Config) Queues {
+func loadQueuesConfig(cfg *Config) Queues {
 	// Create the Queues Config struct
 	queuesConfig := Queues{
 		QueueMap: make(map[string]Queue),
@@ -117,7 +117,7 @@ func loadQueuesConfig(cfg Config) Queues {
 	return queuesConfig
 }
 
-func (cfg Config) InitializeQueue(queueName string) error {
+func (cfg *Config) InitializeQueue(queueName string) error {
 	// Create the configuration data in Riak first
 	// This way it'll be there once the queue is added to the known set
 	configMap, err := cfg.createConfigForQueue(queueName)
@@ -135,7 +135,7 @@ func (cfg Config) InitializeQueue(queueName string) error {
 	return err
 }
 
-func (cfg Config) addToKnownQueues(queueName string) error {
+func (cfg *Config) addToKnownQueues(queueName string) error {
 	// If we disallow topicless-queues, we can remove this and put it into Topic.AddQueue
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
@@ -146,7 +146,7 @@ func (cfg Config) addToKnownQueues(queueName string) error {
 	return queueConfig.Store()
 }
 
-func (cfg Config) removeFromKnownQueues(queueName string) error {
+func (cfg *Config) removeFromKnownQueues(queueName string) error {
 	// If we disallow topicless-queues, we can remove this and put it into Topic.RemoveQueue
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
@@ -158,7 +158,7 @@ func (cfg Config) removeFromKnownQueues(queueName string) error {
 }
 
 // TODO: Take in a map which overrides the defaults
-func (cfg Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
+func (cfg *Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
 	// Get the bucket for holding maps of config data
@@ -179,45 +179,45 @@ func (cfg Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
 
 // SETTERS AND GETTERS FOR QUEUE CONFIG
 
-func (cfg Config) GetVisibilityTimeout(queueName string) (float64, error) {
+func (cfg *Config) GetVisibilityTimeout(queueName string) (float64, error) {
 	val, err := cfg.getQueueSetting(VISIBILITY_TIMEOUT, queueName)
 	parsed, err := strconv.ParseFloat(val, 32)
 	return parsed, err
 }
 
-func (cfg Config) SetVisibilityTimeout(queueName string, timeout float64) error {
+func (cfg *Config) SetVisibilityTimeout(queueName string, timeout float64) error {
 	return cfg.setQueueSetting(VISIBILITY_TIMEOUT, queueName, strconv.FormatFloat(timeout, 'f', -1, 64))
 }
 
-func (cfg Config) GetMinPartitions(queueName string) (int, error) {
+func (cfg *Config) GetMinPartitions(queueName string) (int, error) {
 	val, _ := cfg.getQueueSetting(MIN_PARTITIONS, queueName)
 	return strconv.Atoi(val)
 }
 
-func (cfg Config) SetMinPartitions(queueName string, timeout int) error {
+func (cfg *Config) SetMinPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
 	return cfg.setQueueSetting(MIN_PARTITIONS, queueName, strconv.Itoa(timeout))
 }
 
-func (cfg Config) GetMaxPartitions(queueName string) (int, error) {
+func (cfg *Config) GetMaxPartitions(queueName string) (int, error) {
 	val, _ := cfg.getQueueSetting(MAX_PARTITIONS, queueName)
 	return strconv.Atoi(val)
 }
 
-func (cfg Config) SetMaxPartitions(queueName string, timeout int) error {
+func (cfg *Config) SetMaxPartitions(queueName string, timeout int) error {
 	// TODO do we handle any resizing here? Or does the system "self-adjust"
 	return cfg.setQueueSetting(MAX_PARTITIONS, queueName, strconv.Itoa(timeout))
 }
-func (cfg Config) SetMaxPartitionAge(queueName string, age float64) error {
+func (cfg *Config) SetMaxPartitionAge(queueName string, age float64) error {
 	return cfg.setQueueSetting(MAX_PARTITION_AGE, queueName, strconv.FormatFloat(age, 'f', -1, 64))
 }
-func (cfg Config) GetMaxPartitionAge(queueName string) (float64, error) {
+func (cfg *Config) GetMaxPartitionAge(queueName string) (float64, error) {
 	val, _ := cfg.getQueueSetting(MAX_PARTITION_AGE, queueName)
 	return strconv.ParseFloat(val, 32)
 }
 
 // TODO Find a proper way to scope this to a queue VS a topic
-func (cfg Config) getQueueSetting(paramName string, queueName string) (string, error) {
+func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, error) {
 	// Read from local cache
 	value := ""
 
@@ -259,7 +259,7 @@ func (cfg Config) getQueueSetting(paramName string, queueName string) (string, e
 }
 
 // TODO Find a proper way to scope this to a queue VS a topic
-func (cfg Config) setQueueSetting(paramName string, queueName string, value string) error {
+func (cfg *Config) setQueueSetting(paramName string, queueName string, value string) error {
 	// Write to Riak
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
@@ -282,11 +282,11 @@ func registerValueToString(reg *riak.RDtRegister) string {
 	return string(reg.Value[:])
 }
 
-func (cfg Config) RiakConnection() *riak.Client {
+func (cfg *Config) RiakConnection() *riak.Client {
 	return cfg.RiakPool.GetConn()
 }
 
-func (cfg Config) ReleaseRiakConnection(conn *riak.Client) {
+func (cfg *Config) ReleaseRiakConnection(conn *riak.Client) {
 	cfg.RiakPool.PutConn(conn)
 }
 

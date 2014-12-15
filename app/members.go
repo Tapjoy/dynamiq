@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-func InitMember(cfg Config) *memberlist.Memberlist {
+func InitMember(cfg *Config) *memberlist.Memberlist {
 	memberConf := memberlist.DefaultLANConfig()
 	memberConf.Name = cfg.Core.Name
 	memberConf.BindPort = cfg.Core.Port

@@ -25,7 +25,7 @@ type ConfigRequest struct {
 
 // TODO make message definitions more explicit
 
-func InitWebserver(list *memberlist.Memberlist, cfg Config) {
+func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
