@@ -19,7 +19,7 @@ const QUEUE_RECEIVED_STATS_SUFFIX = "received.count"
 const QUEUE_DELETED_STATS_SUFFIX = "deleted.count"
 const QUEUE_DEPTH_STATS_SUFFIX = "depth.count"
 const QUEUE_INFLIGHT_STATS_SUFFIX = "inflight.count"
-const QUEUE_AVAILABLE_STATS_SUFFIX = "available.count"
+const QUEUE_DEPTHAPR_STATS_SUFFIX = "approximate_depth.count"
 
 type Queues struct {
 	// a container for all queues
@@ -70,9 +70,9 @@ func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessag
 	err = c.IncrGauge(key, numberOfMessages)
 	return err
 }
-func (queue Queue) setQueueAvailable(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
+func (queue Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
 	// set  depth
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_AVAILABLE_STATS_SUFFIX)
+	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTHAPR_STATS_SUFFIX)
 	// find the difference between the first messages id and the last messages id
 
 	first, _ := strconv.ParseInt(ids[0], 10, 64)
@@ -130,7 +130,7 @@ func (queue Queue) Get(cfg Config, list *memberlist.Memberlist, batchsize uint32
 	}
 	//get a list of batchsize message ids
 	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.Itoa(partBottom), strconv.Itoa(partTop), batchsize, "")
-	defer queue.setQueueAvailable(cfg.Stats.Client, list, queue.Name, messageIds)
+	defer queue.setQueueDepthApr(cfg.Stats.Client, list, queue.Name, messageIds)
 
 	if err != nil {
 		log.Printf("Error%v", err)
