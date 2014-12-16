@@ -23,8 +23,8 @@ type Partition struct {
 	LastUsed time.Time
 }
 
-func InitPartitions(cfg *Config, queueName string) Partitions {
-	part := Partitions{
+func InitPartitions(cfg *Config, queueName string) *Partitions {
+	part := &Partitions{
 		partitions: lane.NewPQueue(lane.MINPQ),
 	}
 	// We'll initially allocate the minimum amount
@@ -33,10 +33,10 @@ func InitPartitions(cfg *Config, queueName string) Partitions {
 	return part
 }
 
-func (part Partitions) PartitionCount() int {
+func (part *Partitions) PartitionCount() int {
 	return part.partitions.Size()
 }
-func (part Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, error) {
+func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, error) {
 
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
@@ -85,7 +85,7 @@ func getNodePosition(list *memberlist.Memberlist) (int, int) {
 	return nodePosition, nodeCount
 }
 
-func (part Partitions) getPartitionPosition(cfg *Config, queueName string) (int, int, error) {
+func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int, int, error) {
 	//iterate over the partitions and then increase or decrease the number of partitions
 
 	//TODO move loging out of the sync operation for better throughput
@@ -126,7 +126,7 @@ func (part Partitions) getPartitionPosition(cfg *Config, queueName string) (int,
 	return myPartition, totalPartitions, err
 }
 
-func (part Partitions) makePartitions(cfg *Config, queueName string, partitionsToMake int) {
+func (part *Partitions) makePartitions(cfg *Config, queueName string, partitionsToMake int) {
 	var initialTime time.Time
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	totalPartitions := part.partitions.Size()
@@ -140,7 +140,7 @@ func (part Partitions) makePartitions(cfg *Config, queueName string, partitionsT
 		}
 	}
 }
-func (part Partitions) syncPartitions(cfg *Config, queueName string) {
+func (part *Partitions) syncPartitions(cfg *Config, queueName string) {
 
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)

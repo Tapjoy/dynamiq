@@ -36,7 +36,7 @@ type Queue struct {
 	// name of the queue
 	Name string
 	// the partitions of the queue
-	Parts Partitions
+	Parts *Partitions
 	// Individual settings for the queue
 	Config *riak.RDtMap
 	// Mutex for protecting rw access to the Config object
