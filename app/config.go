@@ -104,14 +104,14 @@ func loadQueuesConfig(cfg *Config) *Queues {
 		// Get the Riak RdtMap of settings for this queue
 		configMap, _ := configBucket.FetchMap(queueConfigRecordName(name))
 		// Pre-warm the settings object
-		queue := Queue{
+		queue := &Queue{
 			Name:   name,
 			Config: configMap,
 			Parts:  InitPartitions(cfg, name),
 		}
 		// TODO: We should be handling errors here
 		// Set the queue in the queue map
-		queuesConfig.QueueMap[name] = &queue
+		queuesConfig.QueueMap[name] = queue
 	}
 	// Return the completed Queue cache of settings
 	return &queuesConfig

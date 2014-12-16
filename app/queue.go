@@ -75,7 +75,7 @@ func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessag
 	err = c.IncrGauge(key, numberOfMessages)
 	return err
 }
-func (queue Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
+func (queue *Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
 	// set  depth
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTHAPR_STATS_SUFFIX)
 	// find the difference between the first messages id and the last messages id
@@ -97,7 +97,7 @@ func (queue Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Member
 	}
 }
 
-func (queues Queues) Exists(cfg *Config, queueName string) bool {
+func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	// For now, lets go right to Riak for this
 	// Because of the config delay, we don't wanna check the memory values
 	client := cfg.RiakConnection()
@@ -117,7 +117,7 @@ func (queues Queues) Exists(cfg *Config, queueName string) bool {
 }
 
 // get a message from the queue
-func (queue Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
+func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions
 	partBottom, partTop, err := queue.Parts.GetPartition(cfg, queue.Name, list)
 
@@ -147,7 +147,7 @@ func (queue Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint3
 }
 
 // Put a Message onto the queue
-func (queue Queue) Put(cfg *Config, message string) string {
+func (queue *Queue) Put(cfg *Config, message string) string {
 	//Grab our bucket
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
@@ -172,7 +172,7 @@ func (queue Queue) Put(cfg *Config, message string) string {
 }
 
 // Delete a Message from the queue
-func (queue Queue) Delete(cfg *Config, id string) bool {
+func (queue *Queue) Delete(cfg *Config, id string) bool {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucket(queue.Name)
@@ -193,7 +193,7 @@ func (queue Queue) Delete(cfg *Config, id string) bool {
 }
 
 // helpers
-func (queue Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
+func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rObjectArrayChan = make(chan []riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
@@ -229,7 +229,7 @@ func (queue Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	return returnVals
 }
 
-func (queues Queues) syncConfig(cfg *Config) {
+func (queues *Queues) syncConfig(cfg *Config) {
 	for {
 		log.Println("syncing Queue config with Riak")
 		client := cfg.RiakConnection()
@@ -325,13 +325,13 @@ func (queue *Queue) syncConfig(cfg *Config) {
 	queue.Parts.syncPartitions(cfg, queue.Name)
 }
 
-func (queue Queue) updateQueueConfig(rCfg *riak.RDtMap) {
+func (queue *Queue) updateQueueConfig(rCfg *riak.RDtMap) {
 	queue.Lock()
 	defer queue.Unlock()
 	queue.Config = rCfg
 }
 
-func (queue Queue) getQueueConfig() *riak.RDtMap {
+func (queue *Queue) getQueueConfig() *riak.RDtMap {
 	queue.RLock()
 	defer queue.RUnlock()
 	return queue.Config
