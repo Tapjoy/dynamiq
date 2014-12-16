@@ -32,7 +32,7 @@ var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COU
 type Config struct {
 	Core     Core
 	Stats    Stats
-	Queues   Queues
+	Queues   *Queues
 	RiakPool RiakPool
 }
 
@@ -75,10 +75,10 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 	return &cfg, err
 }
 
-func loadQueuesConfig(cfg *Config) Queues {
+func loadQueuesConfig(cfg *Config) *Queues {
 	// Create the Queues Config struct
 	queuesConfig := Queues{
-		QueueMap: make(map[string]Queue),
+		QueueMap: make(map[string]*Queue),
 	}
 	// Get the queues
 	client := cfg.RiakConnection()
@@ -111,10 +111,10 @@ func loadQueuesConfig(cfg *Config) Queues {
 		}
 		// TODO: We should be handling errors here
 		// Set the queue in the queue map
-		queuesConfig.QueueMap[name] = queue
+		queuesConfig.QueueMap[name] = &queue
 	}
 	// Return the completed Queue cache of settings
-	return queuesConfig
+	return &queuesConfig
 }
 
 func (cfg *Config) InitializeQueue(queueName string) error {
@@ -127,7 +127,7 @@ func (cfg *Config) InitializeQueue(queueName string) error {
 	// Add to the known set of queues
 	err = cfg.addToKnownQueues(queueName)
 	// Now, add the queue into our memory-cache of data
-	cfg.Queues.QueueMap[queueName] = Queue{
+	cfg.Queues.QueueMap[queueName] = &Queue{
 		Name:   queueName,
 		Parts:  InitPartitions(cfg, queueName),
 		Config: configMap,
@@ -139,6 +139,7 @@ func (cfg *Config) addToKnownQueues(queueName string) error {
 	// If we disallow topicless-queues, we can remove this and put it into Topic.AddQueue
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
+	// We purposefully read from Riak here, we'll enventually-consist with the in memory cache
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	queueConfig, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
 	queueSet := queueConfig.AddSet(QUEUE_SET_NAME)
@@ -150,11 +151,12 @@ func (cfg *Config) removeFromKnownQueues(queueName string) error {
 	// If we disallow topicless-queues, we can remove this and put it into Topic.RemoveQueue
 	client := cfg.RiakConnection()
 	defer cfg.RiakPool.PutConn(client)
+	// We purposefully read from Riak here, we'll enventually-consist with the in memory cache
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	queueConfig, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
 	queueSet := queueConfig.AddSet(QUEUE_SET_NAME)
 	queueSet.Remove([]byte(queueName))
-	return queueSet.Store()
+	return queueConfig.Store()
 }
 
 // TODO: Take in a map which overrides the defaults
@@ -228,9 +230,9 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 
 	// If cfg.Queues.QueueMap[queuename] is nil, it means this server hasn't yet synced with Riak
 	// While we wait, go and read from Riak directly
-	if &cfg.Queues != nil {
+	if cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
-			value = registerValueToString(cfg.Queues.QueueMap[queueName].Config.FetchRegister(paramName))
+			value = registerValueToString(cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName))
 		}
 	}
 

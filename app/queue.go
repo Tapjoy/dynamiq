@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -23,9 +24,11 @@ const QUEUE_DEPTHAPR_STATS_SUFFIX = "approximate_depth.count"
 
 type Queues struct {
 	// a container for all queues
-	QueueMap map[string]Queue
+	QueueMap map[string]*Queue
 	// Settings for Queues in general, ie queue list
 	Config *riak.RDtMap
+	// Mutex for protecting rw access to the Config object
+	sync.RWMutex
 }
 
 type Queue struct {
@@ -36,6 +39,8 @@ type Queue struct {
 	Parts Partitions
 	// Individual settings for the queue
 	Config *riak.RDtMap
+	// Mutex for protecting rw access to the Config object
+	sync.RWMutex
 }
 
 func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
@@ -232,24 +237,29 @@ func (queues Queues) syncConfig(cfg *Config) {
 		if err != nil {
 			log.Println(err)
 		}
-		queues.Config, err = bucket.FetchMap(QUEUE_CONFIG_NAME)
+
+		queuesConfig, err := bucket.FetchMap(QUEUE_CONFIG_NAME)
 		if err != nil {
 			log.Println(err)
 		}
+		val := queuesConfig.AddSet(QUEUE_SET_NAME).GetValue()
+		log.Printf("From riak, the set is length %f", len(val))
+		queues.updateQueuesConfig(queuesConfig)
 
 		//iterate the map and add or remove topics that need to be destroyed
-		queueSet := queues.Config.AddSet(QUEUE_SET_NAME)
+		queueSet := queues.getQueuesConfig().AddSet(QUEUE_SET_NAME)
 
 		if queueSet == nil {
-			//bail if there aren't any topics
+			//bail if there aren't any queues
 			//but not before sleeping
 			cfg.ReleaseRiakConnection(client)
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
 			continue
 		}
 		queueSlice := queueSet.GetValue()
+		log.Printf("Found %s queues in queueset", len(queueSlice))
 		if queueSlice == nil {
-			//bail if there aren't any topics
+			//bail if there aren't any queues
 			//but not before sleeping
 			cfg.ReleaseRiakConnection(client)
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
@@ -261,6 +271,7 @@ func (queues Queues) syncConfig(cfg *Config) {
 		queuesToKeep := make(map[string]bool)
 		for _, queue := range queueSlice {
 			queueName := string(queue)
+			log.Printf("Found queue %s", queueName)
 			var present bool
 			_, present = queues.QueueMap[queueName]
 			if present != true {
@@ -285,6 +296,7 @@ func (queues Queues) syncConfig(cfg *Config) {
 		}
 		//sleep for the configured interval
 		cfg.ReleaseRiakConnection(client)
+		log.Print("Dont syncing queues")
 		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 	}
 }
@@ -302,16 +314,42 @@ func initQueueFromRiak(cfg *Config, queueName string) {
 		Config: config,
 	}
 
-	cfg.Queues.QueueMap[queueName] = queue
+	// This is adding a new member to the collection, it shouldn't need a lock?
+	// TODO Keep an eye on this for emergent issues
+	cfg.Queues.QueueMap[queueName] = &queue
 }
 
-func (queue Queue) syncConfig(cfg *Config) {
+func (queue *Queue) syncConfig(cfg *Config) {
 	//refresh the queue RDtMap
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-	recordName := queueConfigRecordName(queue.Name)
-	queue.Config, _ = bucket.FetchMap(recordName)
-	cfg.Queues.QueueMap[queue.Name] = queue
+
+	rCfg, _ := bucket.FetchMap(queueConfigRecordName(queue.Name))
+	queue.updateQueueConfig(rCfg)
 	queue.Parts.syncPartitions(cfg, queue.Name)
+}
+
+func (queue Queue) updateQueueConfig(rCfg *riak.RDtMap) {
+	queue.Lock()
+	defer queue.Unlock()
+	queue.Config = rCfg
+}
+
+func (queue Queue) getQueueConfig() *riak.RDtMap {
+	queue.RLock()
+	defer queue.RUnlock()
+	return queue.Config
+}
+
+func (queues *Queues) updateQueuesConfig(rCfg *riak.RDtMap) {
+	queues.Lock()
+	defer queues.Unlock()
+	queues.Config = rCfg
+}
+
+func (queues *Queues) getQueuesConfig() *riak.RDtMap {
+	queues.RLock()
+	defer queues.RUnlock()
+	return queues.Config
 }

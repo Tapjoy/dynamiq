@@ -12,7 +12,7 @@ type Topic struct {
 	Name     string
 	Config   *riak.RDtMap
 	riakPool RiakPool
-	queues   Queues
+	queues   *Queues
 }
 
 type Topics struct {
@@ -21,10 +21,10 @@ type Topics struct {
 	// topic map
 	TopicMap map[string]*Topic
 	riakPool RiakPool
-	queues   Queues
+	queues   *Queues
 }
 
-func InitTopics(cfg *Config, queues Queues) Topics {
+func InitTopics(cfg *Config, queues *Queues) Topics {
 	client := cfg.RiakPool.GetConn()
 	defer cfg.RiakPool.PutConn(client)
 	bucket, err := client.NewBucketType("maps", "config")
