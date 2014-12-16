@@ -140,7 +140,7 @@ func (part Partitions) makePartitions(cfg *Config, queueName string, partitionsT
 		}
 	}
 }
-func (part Partitions) syncPartitions(cfg Config, queueName string) {
+func (part Partitions) syncPartitions(cfg *Config, queueName string) {
 
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)

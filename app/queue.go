@@ -242,7 +242,6 @@ func (queues Queues) syncConfig(cfg *Config) {
 		if err != nil {
 			log.Println(err)
 		}
-		val := queuesConfig.AddSet(QUEUE_SET_NAME).GetValue()
 		queues.updateQueuesConfig(queuesConfig)
 
 		//iterate the map and add or remove topics that need to be destroyed
