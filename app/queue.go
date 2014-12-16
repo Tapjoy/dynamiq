@@ -243,7 +243,6 @@ func (queues Queues) syncConfig(cfg *Config) {
 			log.Println(err)
 		}
 		val := queuesConfig.AddSet(QUEUE_SET_NAME).GetValue()
-		log.Printf("From riak, the set is length %f", len(val))
 		queues.updateQueuesConfig(queuesConfig)
 
 		//iterate the map and add or remove topics that need to be destroyed
@@ -257,7 +256,6 @@ func (queues Queues) syncConfig(cfg *Config) {
 			continue
 		}
 		queueSlice := queueSet.GetValue()
-		log.Printf("Found %s queues in queueset", len(queueSlice))
 		if queueSlice == nil {
 			//bail if there aren't any queues
 			//but not before sleeping
@@ -271,7 +269,6 @@ func (queues Queues) syncConfig(cfg *Config) {
 		queuesToKeep := make(map[string]bool)
 		for _, queue := range queueSlice {
 			queueName := string(queue)
-			log.Printf("Found queue %s", queueName)
 			var present bool
 			_, present = queues.QueueMap[queueName]
 			if present != true {
@@ -296,7 +293,6 @@ func (queues Queues) syncConfig(cfg *Config) {
 		}
 		//sleep for the configured interval
 		cfg.ReleaseRiakConnection(client)
-		log.Print("Dont syncing queues")
 		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 	}
 }
