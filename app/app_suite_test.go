@@ -13,9 +13,9 @@ import (
 	"time"
 )
 
-var cfg app.Config
+var cfg *app.Config
 var core app.Core
-var queues app.Queues
+var queues *app.Queues
 var duration time.Duration
 var memberList *memberlist.Memberlist
 var testQueueName = "test_queue"
@@ -28,6 +28,7 @@ func TestPartitions(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	cfg = &app.Config{}
 	// Create the basic Configuration object
 	// later tests can change these values as needed
 	core = app.Core{
@@ -41,7 +42,7 @@ var _ = BeforeSuite(func() {
 		SyncConfigInterval:    duration,
 	}
 
-	queueMap := make(map[string]app.Queue)
+	queueMap := make(map[string]*app.Queue)
 	configRDtMap := riak.RDtMap{
 		Values:   make(map[riak.MapKey]interface{}),
 		ToAdd:    make([]*pb.MapUpdate, 1),
@@ -52,13 +53,13 @@ var _ = BeforeSuite(func() {
 	configRDtMap.Values[riak.MapKey{Key: "min_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DEFAULT_SETTINGS[app.MIN_PARTITIONS])}
 	configRDtMap.Values[riak.MapKey{Key: "visibility_timeout", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DEFAULT_SETTINGS[app.VISIBILITY_TIMEOUT])}
 
-	queue := app.Queue{
+	queue := &app.Queue{
 		Name:   testQueueName,
 		Config: &configRDtMap,
 	}
 	queueMap[testQueueName] = queue
 
-	queues = app.Queues{
+	queues = &app.Queues{
 		QueueMap: queueMap,
 	}
 

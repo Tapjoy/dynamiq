@@ -9,7 +9,7 @@ import (
 var _ = Describe("Partition", func() {
 
 	var (
-		partitions        app.Partitions
+		partitions        *app.Partitions
 		err               error
 		partitionTopId    int
 		partitionBottomId int
