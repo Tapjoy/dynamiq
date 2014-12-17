@@ -11,7 +11,7 @@ import (
 
 type RiakPool chan *riak.Client
 
-func InitRiakPool(cfg Config) RiakPool {
+func InitRiakPool(cfg *Config) RiakPool {
 	var riakPool RiakPool = make(chan *riak.Client, cfg.Core.BackendConnectionPool)
 	for i := 0; i < cfg.Core.BackendConnectionPool; i++ {
 		log.Println("Initializing client pool ", i)
@@ -34,7 +34,7 @@ func (riakPool RiakPool) PutConn(conn *riak.Client) {
 }
 
 //todo add this to the config file
-func (riakPool RiakPool) NewClient(cfg Config) (*riak.Client, string) {
+func (riakPool RiakPool) NewClient(cfg *Config) (*riak.Client, string) {
 	rand.Seed(time.Now().UnixNano())
 	hosts := []string{cfg.Core.RiakNodes}
 	host := hosts[rand.Intn(len(hosts))]

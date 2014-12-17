@@ -12,7 +12,7 @@ type Topic struct {
 	Name     string
 	Config   *riak.RDtMap
 	riakPool RiakPool
-	queues   Queues
+	queues   *Queues
 }
 
 type Topics struct {
@@ -21,10 +21,10 @@ type Topics struct {
 	// topic map
 	TopicMap map[string]*Topic
 	riakPool RiakPool
-	queues   Queues
+	queues   *Queues
 }
 
-func InitTopics(cfg Config, queues Queues) Topics {
+func InitTopics(cfg *Config, queues *Queues) Topics {
 	client := cfg.RiakPool.GetConn()
 	defer cfg.RiakPool.PutConn(client)
 	bucket, err := client.NewBucketType("maps", "config")
@@ -54,7 +54,7 @@ func InitTopics(cfg Config, queues Queues) Topics {
 	return topics
 }
 
-func (topics Topics) InitTopic(name string) {
+func (topics *Topics) InitTopic(name string) {
 	client := topics.riakPool.GetConn()
 	defer topics.riakPool.PutConn(client)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -74,7 +74,7 @@ func (topics Topics) InitTopic(name string) {
 }
 
 //Broadcast the message to all listening queues and return the acked writes
-func (topic *Topic) Broadcast(cfg Config, message string) map[string]string {
+func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 	queueWrites := make(map[string]string)
 	for _, queue := range topic.Config.FetchSet("queues").GetValue() {
 		//check if we've initialized this queue yet
@@ -92,7 +92,7 @@ func (topic *Topic) Broadcast(cfg Config, message string) map[string]string {
 }
 
 // For the time being, this will also initialize the queue new if it does not exist
-func (topic *Topic) AddQueue(cfg Config, name string) {
+func (topic *Topic) AddQueue(cfg *Config, name string) {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 
@@ -118,7 +118,7 @@ func (topic *Topic) AddQueue(cfg Config, name string) {
 	}
 }
 
-func (topic *Topic) DeleteQueue(cfg Config, name string) {
+func (topic *Topic) DeleteQueue(cfg *Config, name string) {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
 	recordName := topicConfigRecordName(topic.Name)
@@ -174,7 +174,7 @@ func (topic *Topic) Delete() {
 
 //helpers
 //TODO move error handling for empty config in riak to initializer
-func (topics Topics) syncConfig(cfg Config) {
+func (topics *Topics) syncConfig(cfg *Config) {
 	for {
 		log.Println("syncing Topic config with Riak")
 		//refresh the topic RDtMap
@@ -233,7 +233,7 @@ func (topics Topics) syncConfig(cfg Config) {
 	}
 }
 
-func (topic Topic) syncConfig() {
+func (topic *Topic) syncConfig() {
 	//refresh the topic RDtMap
 	client := topic.riakPool.GetConn()
 	defer topic.riakPool.PutConn(client)
