@@ -80,20 +80,20 @@ func (queue *Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Membe
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTHAPR_STATS_SUFFIX)
 	// find the difference between the first messages id and the last messages id
 
-	first, _ := strconv.ParseInt(ids[0], 10, 64)
-	last, _ := strconv.ParseInt(ids[len(ids)-1], 10, 64)
-	difference := last - first
-	//find the density of messages
-	density := float64(len(ids)) / float64(difference)
-	// find the total count of messages
-	count := density * math.MaxInt64
-
-	// for small queues where we only return 1 message guesstimate ( or should we return 0? )
-	multiplier := queue.Parts.PartitionCount() * len(list.Members())
-	if len(ids) == 1 {
-		return c.SetGauge(key, int64(len(ids)*multiplier))
-	} else {
+	if len(ids) > 1 {
+		first, _ := strconv.ParseInt(ids[0], 10, 64)
+		last, _ := strconv.ParseInt(ids[len(ids)-1], 10, 64)
+		difference := last - first
+		//find the density of messages
+		density := float64(len(ids)) / float64(difference)
+		// find the total count of messages by multiplying the density by the key range
+		count := density * math.MaxInt64
 		return c.SetGauge(key, int64(count))
+
+	} else {
+		// for small queues where we only return 1  message or no messages guesstimate ( or should we return 0? )
+		multiplier := queue.Parts.PartitionCount() * len(list.Members())
+		return c.SetGauge(key, int64(len(ids)*multiplier))
 	}
 }
 
