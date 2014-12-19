@@ -91,7 +91,6 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 	} else {
 		return myPartition, totalPartitions, errors.New("no available partitions")
 	}
-	//log.Println("partition: " + strconv.Itoa(workingPartition.Id) + " occupied time: " + strconv.FormatFloat(time.Since(workingPartition.LastUsed).Seconds(), 'f', -1, 64))
 	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
 	if time.Since(workingPartition.LastUsed).Seconds() > visTimeout {
 		myPartition = workingPartition.Id
@@ -140,7 +139,6 @@ func (part *Partitions) syncPartitions(cfg *Config, queueName string) {
 		_, _ = part.partitions.Pop()
 		totalPartitions = totalPartitions - 1
 	}
-	log.Println("removed " + strconv.Itoa(partsRemoved) + "partitions from queue " + queueName)
 
 	if part.partitions.Size() < minPartitions {
 		part.makePartitions(cfg, queueName, minPartitions-totalPartitions)

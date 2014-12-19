@@ -177,7 +177,6 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucket(queue.Name)
 	if err == nil {
-		log.Println("Deleting: ", id)
 		err = bucket.Delete(id)
 		if err == nil {
 			defer decrementMessageCount(cfg.Stats.Client, queue.Name, 1)
