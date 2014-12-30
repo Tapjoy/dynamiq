@@ -129,7 +129,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	defer cfg.ReleaseRiakConnection(client)
 
 	//set the bucket
-	bucket, err := client.NewBucket(queue.Name)
+	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err != nil {
 		log.Printf("Error%v", err)
 	}
@@ -151,7 +151,7 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 	//Grab our bucket
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
-	bucket, err := client.NewBucket(queue.Name)
+	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		//Retrieve a UUID
 		rand.Seed(time.Now().UnixNano())
@@ -175,7 +175,7 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 func (queue *Queue) Delete(cfg *Config, id string) bool {
 	client := cfg.RiakConnection()
 	defer cfg.ReleaseRiakConnection(client)
-	bucket, err := client.NewBucket(queue.Name)
+	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		log.Println("Deleting: ", id)
 		err = bucket.Delete(id)
@@ -205,7 +205,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 			client := cfg.RiakConnection()
 			defer cfg.ReleaseRiakConnection(client)
 			//fmt.Println("Getting bucket")
-			bucket, _ := client.NewBucket(queue.Name)
+			bucket, _ := client.NewBucketType("messages", queue.Name)
 			riakKey = <-rKeys
 			//fmt.Println("Getting value")
 			rObject, _ := bucket.Get(riakKey)
