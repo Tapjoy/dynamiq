@@ -3,10 +3,10 @@
 set -x
 set -e
 
-mkdir build
+mkdir -p build
 cd build
 export GOPATH=`pwd`
 go get github.com/Tapjoy/dynamiq
 cd ..
 cp build/bin/dynamiq ./dynamiq
-rm -rf build app dynamiq.go README.md 
+rm -rf build app dynamiq.go README.md
