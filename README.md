@@ -3,6 +3,44 @@ DynamiQ
 
 A simple implimentation of a queue on top of riak
 
+Getting Started
+=========
+
+Prerequisites
+-------------
+To get Dynamiq up and running, you need to have a few pre-requisites installed. 
+
+First, you need an installation of Riak 2.0 up and running somewhere (preferably local for testing / development). You can find guides on how to install Riak 2.0 for your particular operating system [here](http://docs.basho.com/riak/latest/quickstart/)
+
+Second, you will need go installed. You can find the instructions [here](https://golang.org/doc/install). Go has incredibly opinionated ideas about where to place code so it can resolve dependencies and perform it's linking, so you'll need to do it the Go way or you're gonna have a bad time. Since you can't effectively develop and compile Go code outside of the primary go directory, this means the best place to install the go directory is within your existing directory for holding source code, in it's own directory "go". 
+
+One thing to note is to make sure you have an environment variable GOPATH set to the location of this directory. For example, if your source code is normally in ~/src, and you installed go to ~/src/go, then GOPATH should be set to ~/src/go
+
+Navigate into your go directory, and run the following
+
+```
+go get github.com/Tapjoy/dynamiq
+mkdir lib
+cp ./src/github.com/Tapjoy/dynamiq/lib/config.gcfg ./lib/config.gcfg
+./bin/dynamiq
+```
+
+This will not only fetch Dynamiq, but also all of it's dependencies and their dependencies as well. Additionally this will create a config file where the compiled binary can locate it for local testing.
+
+Next, you need to enable certain bucket types in Riak 2.0. This is taken care of for you in the setup.sh script provided by Dynamiq. Simply run that script, and Riak 2.0 should be ready to use.
+
+
+Running Dynamiq
+---------------
+
+Now that you have the pre-reqs installed, it's time to run Dynamiq. You can compile and run Dynamiq easiest by invoking it from go directly each time. Navigate into the Dynamiq directory ($GOPATH/src/github.com/Tapjoy/dynamiq) and run the following:
+
+```
+go run dynamiq.go
+```
+
+If all is well, you should see log messages about booting up, and "syncing" with Riak. This means you're ready to begin using Dynamiq! Please continue on to the API section to learn how to create and utilize topics and queues in Dynamiq
+
 Summary
 =========
 This is a simple proof of concept demonstrating the effectiveness of implementing a Distributed data bag implementation on top of Riak or an alternative store which has the following properties.
@@ -49,19 +87,7 @@ DELETE)  O(1)
 
 GET Times
 =========
-
-the assumption of a log n get is based on a standard index scan, as we only need to read the beginning or end of the index it is possible to achieve O(1) GET operations
-
-
-getting started
-=========
-```
-export GOPATH=`pwd`
-go get github.com/Tapjoy/dynamiq
-mkdir lib
-cp ./src/github.com/Tapjoy/dynamiq/lib/config.gcfg ./lib/config.gcfg
-./bin/dynamiq
-```
+The assumption of a log n get is based on a standard index scan, as we only need to read the beginning or end of the index it is possible to achieve O(1) GET operations
 
 Implementation
 ==========
@@ -91,5 +117,33 @@ DELETE)
 
   1) delete the message matching the inbound uuid
 
+Client Libraries
+================
 
+* Ruby - https://github.com/Tapjoy/dynamiq-ruby-client
+* Scala - Coming Soon
 
+REST API
+============
+
+Dynamiq supports a REST API for communicating between clients and Dynamiq. The following is a list of routes, and the verbs they accept, for you to refer to in developing against Dynamiq. You should strive to use one of the official clients, in lieu of direct HTTP access in your applications.
+
+* PUT /topics/{topic_name} : Creates a topic with the given name
+* DELETE /topics/{topic_name} : Deletes a topic with the given name
+* PUT /queues/{queue_name} : Creates a queue with the given name
+* DELETE /queues/{queue_name} : Deletes a queue with the given name
+* PUT /topics/{topic_name}/queues/{queue_name} : Subscribed the given queue to the given topic
+* PUT /topics/{topic_name}/message : Publish the data in the request body as a message to all subscribed queues
+* PUT /queues/{queue_name}/message : Enqueue the data in the request body as a message to the given queue
+* GET /queues/{queue_name}/messages/{batch_size} : Retrieves up to the given batch_size in messages from the given queue
+* DELETE /queues/{queue_name}/message/{message_id} : Deletes the message specified by the message_id from the given queue
+* GET /queues/{queue_name} : Retrieves configuration and metadata about the given queue
+* PATCH /queues/{queue_name} : Update the configuration of the given queue.
+
+PATCH /queues/{queue_name} currently accepts the following fields
+
+* visibility_timeout : The amount of time a partition should be considered "locked" to prevent it from serving duplicate messages too quickly
+* min_partitions : The minimum number of slices of the keyspace this queue should have, spread across all nodes in the cluster. For high-throughput queues, you'll want to keep this number high, and always below the maximum
+* max_partitions : The maximum number of slices of keyspace this queue should have, spread across all nodes in the cluster. For high-throughput queues, you'll want to keep this number high, and always above the minimum
+
+Changing any of these values will result in an immediate write to Riak ensuring the data is persisted, however the individual Dynamiq nodes (including the node you issued the request to) will not have their in memory configuration updated until the next "Sync" with Riak.
