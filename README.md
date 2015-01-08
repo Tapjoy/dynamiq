@@ -149,7 +149,7 @@ Client Libraries
 ================
 
 * Ruby - https://github.com/Tapjoy/dynamiq-ruby-client
-* Scala - Coming Soon
+* Scala - https://github.com/Tapjoy/dynamiq-scala-client
 
 REST API
 ============
