@@ -13,6 +13,7 @@ var _ = Describe("Partition", func() {
 		err               error
 		partitionTopId    int
 		partitionBottomId int
+		partition         *app.Partition
 	)
 
 	BeforeEach(func() {
@@ -30,7 +31,7 @@ var _ = Describe("Partition", func() {
 	Context("GetPartition", func() {
 		BeforeEach(func() {
 			// Get the partition ids, and any errors
-			partitionBottomId, partitionTopId, err = partitions.GetPartition(cfg, testQueueName, memberList)
+			partitionBottomId, partitionTopId, partition, err = partitions.GetPartition(cfg, testQueueName, memberList)
 		})
 
 		It("should get a partitionTopId", func() {
