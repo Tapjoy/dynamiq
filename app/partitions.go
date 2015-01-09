@@ -36,7 +36,7 @@ func InitPartitions(cfg *Config, queueName string) *Partitions {
 func (part *Partitions) PartitionCount() int {
 	return part.partitions.Size()
 }
-func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, error) {
+func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, *Partition, error) {
 
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
@@ -49,7 +49,7 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	nodeTop := (nodePosition + 1) * step
 	log.Println("Node Bottom: " + strconv.Itoa(nodeBottom))
 	log.Println("Node Top: " + strconv.Itoa(nodeTop))
-	myPartition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
+	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
 	if err != nil {
 		log.Println(err)
 	}
@@ -64,7 +64,7 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	log.Println("partitionBottom: " + strconv.Itoa(partitionBottom))
 	partitionTop := nodeStep*(myPartition+1) + nodeBottom
 	log.Println("partitionTop: " + strconv.Itoa(partitionTop))
-	return partitionBottom, partitionTop, err
+	return partitionBottom, partitionTop, partition, err
 }
 
 //helper method to get the node position
@@ -85,7 +85,7 @@ func getNodePosition(list *memberlist.Memberlist) (int, int) {
 	return nodePosition, nodeCount
 }
 
-func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int, int, error) {
+func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int, *Partition, int, error) {
 	//iterate over the partitions and then increase or decrease the number of partitions
 
 	//TODO move loging out of the sync operation for better throughput
@@ -99,14 +99,13 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 	if poppedPartition != nil {
 		workingPartition = poppedPartition.(*Partition)
 	} else {
-		return myPartition, totalPartitions, errors.New("no available partitions")
+		// this seems a little scary
+		return myPartition, workingPartition, totalPartitions, errors.New("no available partitions")
 	}
 	log.Println("partition: " + strconv.Itoa(workingPartition.Id) + " occupied time: " + strconv.FormatFloat(time.Since(workingPartition.LastUsed).Seconds(), 'f', -1, 64))
 	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
 	if time.Since(workingPartition.LastUsed).Seconds() > visTimeout {
 		myPartition = workingPartition.Id
-		workingPartition.LastUsed = time.Now()
-		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 	} else {
 		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 		part.Lock()
@@ -114,16 +113,25 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 		if totalPartitions < maxPartitions {
 			workingPartition := new(Partition)
 			workingPartition.Id = totalPartitions
-			workingPartition.LastUsed = time.Now()
 			myPartition = workingPartition.Id
-			part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 		} else {
 			err = errors.New("no available partitions")
 		}
 		part.Unlock()
 	}
 	log.Println("totalPartitions:" + strconv.Itoa(totalPartitions))
-	return myPartition, totalPartitions, err
+	return myPartition, workingPartition, totalPartitions, err
+}
+func (part *Partitions) PushPartition(cfg *Config, queueName string, partition *Partition, lock bool) {
+	if lock {
+		partition.LastUsed = time.Now()
+		part.partitions.Push(partition, partition.LastUsed.UnixNano())
+	} else {
+		visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
+		unlockTime := int(visTimeout)
+		partition.LastUsed = time.Now().Add(-(time.Duration(unlockTime) * time.Second))
+		part.partitions.Push(partition, partition.LastUsed.UnixNano())
+	}
 }
 
 func (part *Partitions) makePartitions(cfg *Config, queueName string, partitionsToMake int) {

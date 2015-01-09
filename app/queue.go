@@ -119,7 +119,7 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 // get a message from the queue
 func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
 	// get the top and bottom partitions
-	partBottom, partTop, err := queue.Parts.GetPartition(cfg, queue.Name, list)
+	partBottom, partTop, partition, err := queue.Parts.GetPartition(cfg, queue.Name, list)
 
 	if err != nil {
 		return nil, err
@@ -141,6 +141,12 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 		log.Printf("Error%v", err)
 	}
 	messageCount := len(messageIds)
+	// return the partition to the parts heap, but only lock it when we have messages
+	if messageCount > 0 {
+		defer queue.Parts.PushPartition(cfg, queue.Name, partition, true)
+	} else {
+		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
+	}
 	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, int64(messageCount))
 	log.Println("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
