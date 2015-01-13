@@ -170,6 +170,14 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		r.JSON(200, response)
 	})
 
+	m.Get("/queues", func(r render.Render, params martini.Params) {
+                queueList := make([]string, 0, 10)
+                for queueName, _ := range queues.QueueMap {
+                        queueList = append(queueList, queueName)
+                }
+                r.JSON(200, map[string]interface{}{"queues": queueList})
+	})
+
 	m.Get("/queues/:queue", func(r render.Render, params martini.Params) {
 		//check if we've initialized this queue yet
 		var present bool
