@@ -7,6 +7,7 @@ import (
 	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/tpjg/goriakpbc"
 	"log"
+	"math/rand"
 	"strconv"
 	"time"
 )
@@ -33,7 +34,7 @@ type Config struct {
 	Core     Core
 	Stats    Stats
 	Queues   *Queues
-	RiakPool RiakPool
+	RiakPool *riak.Client
 }
 
 type Core struct {
@@ -56,13 +57,21 @@ type Stats struct {
 	InternalStatsdServer bool
 }
 
+func initRiakPool(cfg *Config) *riak.Client {
+	rand.Seed(time.Now().UnixNano())
+	// TODO this should just be 1 HAProxy
+	hosts := []string{cfg.Core.RiakNodes}
+	host := hosts[rand.Intn(len(hosts))]
+	return riak.NewClientPool(host, cfg.Core.BackendConnectionPool)
+}
+
 func GetCoreConfig(config_file *string) (*Config, error) {
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, *config_file)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.RiakPool = InitRiakPool(&cfg)
+	cfg.RiakPool = initRiakPool(&cfg)
 	cfg.Queues = loadQueuesConfig(&cfg)
 	switch cfg.Stats.Type {
 	case "statsd":
@@ -82,7 +91,6 @@ func loadQueuesConfig(cfg *Config) *Queues {
 	}
 	// Get the queues
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 	// TODO: We should be handling errors here
 	// Get the bucket holding the map of config data
 	configBucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -138,7 +146,6 @@ func (cfg *Config) InitializeQueue(queueName string) error {
 func (cfg *Config) addToKnownQueues(queueName string) error {
 	// If we disallow topicless-queues, we can remove this and put it into Topic.AddQueue
 	client := cfg.RiakConnection()
-	defer cfg.RiakPool.PutConn(client)
 	// We purposefully read from Riak here, we'll enventually-consist with the in memory cache
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	queueConfig, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
@@ -150,7 +157,6 @@ func (cfg *Config) addToKnownQueues(queueName string) error {
 func (cfg *Config) removeFromKnownQueues(queueName string) error {
 	// If we disallow topicless-queues, we can remove this and put it into Topic.RemoveQueue
 	client := cfg.RiakConnection()
-	defer cfg.RiakPool.PutConn(client)
 	// We purposefully read from Riak here, we'll enventually-consist with the in memory cache
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	queueConfig, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
@@ -162,7 +168,6 @@ func (cfg *Config) removeFromKnownQueues(queueName string) error {
 // TODO: Take in a map which overrides the defaults
 func (cfg *Config) createConfigForQueue(queueName string) (*riak.RDtMap, error) {
 	client := cfg.RiakConnection()
-	defer cfg.RiakPool.PutConn(client)
 	// Get the bucket for holding maps of config data
 	// TODO: Find a nice way to DRY this up - it's a lil copy/pasty
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -240,7 +245,6 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 	if value == "" {
 		// Read from riak
 		client := cfg.RiakConnection()
-		defer cfg.ReleaseRiakConnection(client)
 		bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		obj, err := bucket.FetchMap(queueConfigRecordName(queueName))
 
@@ -264,7 +268,6 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 func (cfg *Config) setQueueSetting(paramName string, queueName string, value string) error {
 	// Write to Riak
 	client := cfg.RiakConnection()
-	defer cfg.RiakPool.PutConn(client)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	obj, err := bucket.FetchMap(queueConfigRecordName(queueName))
 	// if not found... no config existed for that queue - should not happen hashtagcrossfingers
@@ -285,11 +288,7 @@ func registerValueToString(reg *riak.RDtRegister) string {
 }
 
 func (cfg *Config) RiakConnection() *riak.Client {
-	return cfg.RiakPool.GetConn()
-}
-
-func (cfg *Config) ReleaseRiakConnection(conn *riak.Client) {
-	cfg.RiakPool.PutConn(conn)
+	return cfg.RiakPool
 }
 
 func queueConfigRecordName(queueName string) string {
