@@ -52,23 +52,48 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		_, present = topics.TopicMap[params["topic"]]
 		if present != true {
 			topics.InitTopic(params["topic"])
+			r.JSON(200, map[string]interface{}{"Deleted": topics.DeleteTopic(params["topic"])})
+		} else {
+			r.JSON(422, map[string]interface{}{"error": "Topic did not exist."})
 		}
-		r.JSON(200, map[string]interface{}{"Deleted": topics.DeleteTopic(params["topic"])})
 	})
 
 	m.Put("/queues/:queue", func(r render.Render, params martini.Params) {
-		cfg.InitializeQueue(params["queue"])
-		r.JSON(200, "ok")
+		var present bool
+		_, present = queues.QueueMap[params["queue"]]
+		if present != true {
+			cfg.InitializeQueue(params["queue"])
+			r.JSON(200, "ok")
+		} else {
+			r.JSON(422, map[string]interface{}{"error": "Queue already exists."})
+		}
+	})
+
+	m.Put("/topics/:topic", func(r render.Render, params martini.Params) {
+		var present bool
+		_, present = topics.TopicMap[params["topic"]]
+		if present != true {
+			topics.InitTopic(params["topic"])
+			r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+		} else {
+			r.JSON(422, map[string]interface{}{"error": "Topic already exists."})
+		}
 	})
 
 	m.Put("/topics/:topic/queues/:queue", func(r render.Render, params martini.Params) {
 		var present bool
 		_, present = topics.TopicMap[params["topic"]]
 		if present != true {
-			topics.InitTopic(params["topic"])
+			r.JSON(422, map[string]interface{}{"error": "Topic does not exist. Please create it first."})
+		} else {
+			_, present = queues.QueueMap[params["queue"]]
+			if present != true {
+				r.JSON(422, map[string]interface{}{"error": "Queue does not exist. Please create it first"})
+			} else {
+				topics.TopicMap[params["topic"]].AddQueue(cfg, params["queue"])
+				r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+			}
 		}
-		topics.TopicMap[params["topic"]].AddQueue(cfg, params["queue"])
-		r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 	})
 
 	// neeeds a little work....
@@ -171,11 +196,11 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	})
 
 	m.Get("/queues", func(r render.Render, params martini.Params) {
-                queueList := make([]string, 0, 10)
-                for queueName, _ := range queues.QueueMap {
-                        queueList = append(queueList, queueName)
-                }
-                r.JSON(200, map[string]interface{}{"queues": queueList})
+		queueList := make([]string, 0, 10)
+		for queueName, _ := range queues.QueueMap {
+			queueList = append(queueList, queueName)
+		}
+		r.JSON(200, map[string]interface{}{"queues": queueList})
 	})
 
 	m.Get("/queues/:queue", func(r render.Render, params martini.Params) {
