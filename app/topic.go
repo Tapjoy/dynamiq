@@ -165,14 +165,28 @@ func (topics *Topics) syncConfig(cfg *Config) {
 		client := topics.riakPool
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
+			// This is likely caused by a network blip against the riak node, or the node being down
+			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
+			// skip this iteration of the config sync, and try again at the next interval
+			log.Println("There was an error attempting to read the from the configuration bucket")
 			log.Println(err)
+			//cfg.ResetRiakConnection()
+			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+			continue
 		}
 		//fetch the map ignore error for event that map doesn't exist
 		//TODO make these keys configurable?
 		//Question is this thread safe...?
 		topics.Config, err = bucket.FetchMap("topicsConfig")
 		if err != nil {
+			// This is likely caused by a network blip against the riak node, or the node being down
+			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
+			// skip this iteration of the config sync, and try again at the next interval
+			log.Println("There was an error attempting to read from the queue configuration map in the configuration bucket")
 			log.Println(err)
+			//cfg.ResetRiakConnection()
+			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+			continue
 		}
 		//iterate the map and add or remove topics that need to be destroyed
 		topicSlice := topics.Config.FetchSet("topics").GetValue()

@@ -117,12 +117,6 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 
 // get a message from the queue
 func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
-	// get the top and bottom partitions
-	partBottom, partTop, partition, err := queue.Parts.GetPartition(cfg, queue.Name, list)
-
-	if err != nil {
-		return nil, err
-	}
 	// grab a riak client
 	client := cfg.RiakConnection()
 
@@ -130,6 +124,14 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err != nil {
 		log.Printf("Error%v", err)
+		return nil, err
+	}
+
+	// get the top and bottom partitions
+	partBottom, partTop, partition, err := queue.Parts.GetPartition(cfg, queue.Name, list)
+
+	if err != nil {
+		return nil, err
 	}
 	//get a list of batchsize message ids
 	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.Itoa(partBottom), strconv.Itoa(partTop), batchsize, "")
@@ -236,12 +238,31 @@ func (queues *Queues) syncConfig(cfg *Config) {
 		client := cfg.RiakConnection()
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
+			// This is likely caused by a network blip against the riak node, or the node being down
+			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
+			// skip this iteration of the config sync, and try again at the next interval
+			log.Println("There was an error attempting to read the from the configuration bucket")
 			log.Println(err)
+			//cfg.ResetRiakConnection()
+			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+			continue
 		}
 
 		queuesConfig, err := bucket.FetchMap(QUEUE_CONFIG_NAME)
 		if err != nil {
-			log.Println(err)
+			if err.Error() == "Object not found" {
+				// This means there are no queues yet
+				// We don't need to log this, and we don't need to get held up on it.
+			} else {
+				// This is likely caused by a network blip against the riak node, or the node being down
+				// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
+				// skip this iteration of the config sync, and try again at the next interval
+				log.Println("There was an error attempting to read from the queue configuration map in the configuration bucket")
+				log.Println(err)
+				//cfg.ResetRiakConnection()
+				time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+				continue
+			}
 		}
 		queues.updateQueuesConfig(queuesConfig)
 

@@ -31,10 +31,11 @@ var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, 
 var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "50", MIN_PARTITIONS: "10", MAX_PARTITIONS: "100", MAX_PARTITION_AGE: "300"}
 
 type Config struct {
-	Core     Core
-	Stats    Stats
-	Queues   *Queues
-	RiakPool *riak.Client
+	Core          Core
+	Stats         Stats
+	Queues        *Queues
+	RiakPool      *riak.Client
+	resetRiakPool bool
 }
 
 type Core struct {
@@ -65,12 +66,17 @@ func initRiakPool(cfg *Config) *riak.Client {
 	return riak.NewClientPool(host, cfg.Core.BackendConnectionPool)
 }
 
+func (cfg *Config) ResetRiakConnection() {
+	cfg.resetRiakPool = true
+}
+
 func GetCoreConfig(config_file *string) (*Config, error) {
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, *config_file)
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg.resetRiakPool = false
 	cfg.RiakPool = initRiakPool(&cfg)
 	cfg.Queues = loadQueuesConfig(&cfg)
 	switch cfg.Stats.Type {
@@ -288,6 +294,10 @@ func registerValueToString(reg *riak.RDtRegister) string {
 }
 
 func (cfg *Config) RiakConnection() *riak.Client {
+	if cfg.resetRiakPool == true {
+		// This will cause it to return a re-connected client on the next attempt to use it
+		cfg.RiakConnection().Close()
+	}
 	return cfg.RiakPool
 }
 
