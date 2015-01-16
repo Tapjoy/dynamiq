@@ -11,7 +11,7 @@ type Topic struct {
 	// store a CRDT in riak for the topic configuration including subscribers
 	Name     string
 	Config   *riak.RDtMap
-	riakPool RiakPool
+	riakPool *riak.Client
 	queues   *Queues
 }
 
@@ -20,13 +20,12 @@ type Topics struct {
 	Config *riak.RDtMap
 	// topic map
 	TopicMap map[string]*Topic
-	riakPool RiakPool
+	riakPool *riak.Client
 	queues   *Queues
 }
 
 func InitTopics(cfg *Config, queues *Queues) Topics {
-	client := cfg.RiakPool.GetConn()
-	defer cfg.RiakPool.PutConn(client)
+	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("maps", "config")
 	if err != nil {
 		log.Println(err)
@@ -55,8 +54,7 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 }
 
 func (topics *Topics) InitTopic(name string) {
-	client := topics.riakPool.GetConn()
-	defer topics.riakPool.PutConn(client)
+	client := topics.riakPool
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	config, _ := bucket.FetchMap(topicConfigRecordName(name))
 
@@ -93,7 +91,6 @@ func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 
 func (topic *Topic) AddQueue(cfg *Config, name string) {
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 
 	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	recordName := topicConfigRecordName(topic.Name)
@@ -110,7 +107,6 @@ func (topic *Topic) AddQueue(cfg *Config, name string) {
 
 func (topic *Topic) DeleteQueue(cfg *Config, name string) {
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 	recordName := topicConfigRecordName(topic.Name)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	topic.Config, _ = bucket.FetchMap(recordName)
@@ -135,8 +131,7 @@ func (topic *Topic) ListQueues() []string {
 }
 
 func (topics Topics) DeleteTopic(name string) bool {
-	client := topics.riakPool.GetConn()
-	defer topics.riakPool.PutConn(client)
+	client := topics.riakPool
 	bucket, err := client.NewBucketType("maps", "config")
 	topics.Config, err = bucket.FetchMap("topicsConfig")
 	topics.Config.FetchSet("topics").Remove([]byte(name))
@@ -153,8 +148,7 @@ func (topics Topics) DeleteTopic(name string) bool {
 }
 
 func (topic *Topic) Delete() {
-	client := topic.riakPool.GetConn()
-	defer topic.riakPool.PutConn(client)
+	client := topic.riakPool
 
 	bucket, _ := client.NewBucketType("maps", "config")
 	recordName := topicConfigRecordName(topic.Name)
@@ -168,7 +162,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 	for {
 		log.Println("syncing Topic config with Riak")
 		//refresh the topic RDtMap
-		client := topics.riakPool.GetConn()
+		client := topics.riakPool
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
 			log.Println(err)
@@ -185,7 +179,6 @@ func (topics *Topics) syncConfig(cfg *Config) {
 		if topicSlice == nil {
 			//bail if there aren't any topics
 			//but not before sleeping
-			topics.riakPool.PutConn(client)
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
 			continue
 		}
@@ -217,7 +210,6 @@ func (topics *Topics) syncConfig(cfg *Config) {
 			topic.syncConfig()
 		}
 		//sleep for the configured interval
-		topics.riakPool.PutConn(client)
 		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 
 	}
@@ -225,8 +217,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 
 func (topic *Topic) syncConfig() {
 	//refresh the topic RDtMap
-	client := topic.riakPool.GetConn()
-	defer topic.riakPool.PutConn(client)
+	client := topic.riakPool
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	recordName := topicConfigRecordName(topic.Name)
 	topic.Config, _ = bucket.FetchMap(recordName)

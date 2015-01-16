@@ -101,7 +101,6 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	// For now, lets go right to Riak for this
 	// Because of the config delay, we don't wanna check the memory values
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	m, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
@@ -126,7 +125,6 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	}
 	// grab a riak client
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 
 	//set the bucket
 	bucket, err := client.NewBucketType("messages", queue.Name)
@@ -156,7 +154,6 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 func (queue *Queue) Put(cfg *Config, message string) string {
 	//Grab our bucket
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		//Retrieve a UUID
@@ -180,7 +177,6 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 // Delete a Message from the queue
 func (queue *Queue) Delete(cfg *Config, id string) bool {
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		log.Println("Deleting: ", id)
@@ -209,7 +205,6 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		go func() {
 			var riakKey string
 			client := cfg.RiakConnection()
-			defer cfg.ReleaseRiakConnection(client)
 			//fmt.Println("Getting bucket")
 			bucket, _ := client.NewBucketType("messages", queue.Name)
 			riakKey = <-rKeys
@@ -256,7 +251,6 @@ func (queues *Queues) syncConfig(cfg *Config) {
 		if queueSet == nil {
 			//bail if there aren't any queues
 			//but not before sleeping
-			cfg.ReleaseRiakConnection(client)
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
 			continue
 		}
@@ -264,7 +258,6 @@ func (queues *Queues) syncConfig(cfg *Config) {
 		if queueSlice == nil {
 			//bail if there aren't any queues
 			//but not before sleeping
-			cfg.ReleaseRiakConnection(client)
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
 			continue
 		}
@@ -297,14 +290,12 @@ func (queues *Queues) syncConfig(cfg *Config) {
 			queue.syncConfig(cfg)
 		}
 		//sleep for the configured interval
-		cfg.ReleaseRiakConnection(client)
 		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 	}
 }
 
 func initQueueFromRiak(cfg *Config, queueName string) {
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	config, _ := bucket.FetchMap(queueConfigRecordName(queueName))
@@ -323,7 +314,6 @@ func initQueueFromRiak(cfg *Config, queueName string) {
 func (queue *Queue) syncConfig(cfg *Config) {
 	//refresh the queue RDtMap
 	client := cfg.RiakConnection()
-	defer cfg.ReleaseRiakConnection(client)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 
 	rCfg, _ := bucket.FetchMap(queueConfigRecordName(queue.Name))
