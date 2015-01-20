@@ -5,8 +5,8 @@
  seedport=7000
  httpport=8081
  riaknodes="127.0.0.1:8087"
- backendconnectionpool=16
- syncconfiginterval=10000
+ backendconnectionpool=128
+ syncconfiginterval=1000
 [stats]
  type=statsd #(statsd|statsdinternal|none)
  flushinterval=2 #number of seconds to hold data in memory before flushing
