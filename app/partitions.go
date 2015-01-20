@@ -158,9 +158,7 @@ func (part *Partitions) syncPartitions(cfg *Config, queueName string) {
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)
 	maxPartitionAge, _ := cfg.GetMaxPartitionAge(queueName)
-	log.Println("Got max part: " + strconv.Itoa(maxPartitions))
-	log.Println("Got min part: " + strconv.Itoa(minPartitions))
-	log.Println("Got max age: " + strconv.FormatFloat(maxPartitionAge, 'f', -1, 64))
+
 	var partsRemoved int
 	for partsRemoved = 0; maxPartitions < part.partitionCount; partsRemoved++ {
 		_, _ = part.partitions.Pop()
