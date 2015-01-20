@@ -71,6 +71,7 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	cfg.RiakPool = initRiakPool(&cfg)
 	cfg.Queues = loadQueuesConfig(&cfg)
 	switch cfg.Stats.Type {

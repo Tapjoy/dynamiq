@@ -47,7 +47,6 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// CONFIGURATION API BLOCK
 
 	m.Delete("/topics/:topic", func(r render.Render, params martini.Params) {
-
 		var present bool
 		_, present = topics.TopicMap[params["topic"]]
 		if present != true {
@@ -232,6 +231,9 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				r.JSON(422, err.Error())
 			}
 			messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
+			if err != nil {
+				r.JSON(204, err.Error())
+			}
 			//TODO move this into the Queue.Get code
 			messageList := make([]map[string]interface{}, 0, 10)
 			//Format response
@@ -283,11 +285,4 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// DATA INTERACTION API BLOCK
 
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
-}
-
-func HandleError(r render.Render, status_code int, err error) {
-	if err != nil {
-		log.Println(err)
-		r.JSON(status_code, err.Error())
-	}
 }

@@ -158,6 +158,7 @@ func (part *Partitions) syncPartitions(cfg *Config, queueName string) {
 	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)
 	maxPartitionAge, _ := cfg.GetMaxPartitionAge(queueName)
+
 	var partsRemoved int
 	for partsRemoved = 0; maxPartitions < part.partitionCount; partsRemoved++ {
 		_, _ = part.partitions.Pop()
@@ -175,6 +176,9 @@ func (part *Partitions) syncPartitions(cfg *Config, queueName string) {
 	poppedPartition, _ := part.partitions.Pop()
 	if poppedPartition != nil {
 		workingPartition = poppedPartition.(*Partition)
+	} else {
+		// this seems a little scary. we do a similiar thing in getPartitionPosition
+		return
 	}
 	part.partitionCount = part.partitionCount - 1
 
