@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
+	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app"
-	"log"
 )
 
 func main() {
@@ -14,8 +14,9 @@ func main() {
 	//setup the config file
 	cfg, err := app.GetCoreConfig(config_file)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
+	logrus.SetLevel(cfg.Core.LogLevel)
 
 	list := app.InitMember(cfg)
 

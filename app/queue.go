@@ -2,10 +2,10 @@ package app
 
 import (
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
-	"log"
 	"math"
 	"math/rand"
 	"strconv"
@@ -107,7 +107,7 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	set := m.AddSet(QUEUE_SET_NAME)
 
 	for _, value := range set.GetValue() {
-		log.Printf("Looking for %s, found %s", queueName, string(value[:]))
+		logrus.Printf("Looking for %s, found %s", queueName, string(value[:]))
 		if string(value[:]) == queueName {
 			return true
 		}
@@ -123,7 +123,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	//set the bucket
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err != nil {
-		log.Printf("Error%v", err)
+		logrus.Printf("Error%v", err)
 		return nil, err
 	}
 
@@ -138,7 +138,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	defer queue.setQueueDepthApr(cfg.Stats.Client, list, queue.Name, messageIds)
 
 	if err != nil {
-		log.Printf("Error%v", err)
+		logrus.Printf("Error%v", err)
 	}
 	messageCount := len(messageIds)
 	// return the partition to the parts heap, but only lock it when we have messages
@@ -148,7 +148,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
 	}
 	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, int64(messageCount))
-	log.Println("Message retrieved ", messageCount)
+	logrus.Println("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
 }
 
@@ -188,7 +188,7 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 		}
 	}
 	if err != nil {
-		log.Println(err)
+		logrus.Println(err)
 	}
 	// if we got here we're borked
 	// TODO stats cleanup? Possibility that this gets us out of sync
@@ -227,21 +227,21 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		}
 	}
 	elapsed := time.Since(start)
-	log.Printf("Get Multi Took %s\n", elapsed)
+	logrus.Printf("Get Multi Took %s\n", elapsed)
 	return returnVals
 }
 
 func (queues *Queues) syncConfig(cfg *Config) {
 	for {
-		log.Println("syncing Queue config with Riak")
+		logrus.Println("syncing Queue config with Riak")
 		client := cfg.RiakConnection()
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
 			// This is likely caused by a network blip against the riak node, or the node being down
 			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 			// skip this iteration of the config sync, and try again at the next interval
-			log.Println("There was an error attempting to read the from the configuration bucket")
-			log.Println(err)
+			logrus.Println("There was an error attempting to read the from the configuration bucket")
+			logrus.Println(err)
 			//cfg.ResetRiakConnection()
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 			continue
@@ -256,8 +256,8 @@ func (queues *Queues) syncConfig(cfg *Config) {
 				// This is likely caused by a network blip against the riak node, or the node being down
 				// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 				// skip this iteration of the config sync, and try again at the next interval
-				log.Println("There was an error attempting to read from the queue configuration map in the configuration bucket")
-				log.Println(err)
+				logrus.Println("There was an error attempting to read from the queue configuration map in the configuration bucket")
+				logrus.Println(err)
 				//cfg.ResetRiakConnection()
 				time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 				continue

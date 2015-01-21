@@ -2,9 +2,9 @@ package app
 
 import (
 	"errors"
+	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/lane"
 	"github.com/hashicorp/memberlist"
-	"log"
 	"math"
 	"math/rand"
 	"sort"
@@ -50,7 +50,7 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	nodeTop := (nodePosition + 1) * step
 	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
 	if err != nil {
-		log.Println(err)
+		logrus.Println(err)
 	}
 
 	// calculate my range for the given number

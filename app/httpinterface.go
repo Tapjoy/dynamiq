@@ -3,13 +3,14 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/go-martini/martini"
 	"github.com/hashicorp/memberlist"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 // TODO Should this live in the config package?
@@ -25,13 +26,48 @@ type ConfigRequest struct {
 
 // TODO make message definitions more explicit
 
+func logrusLogger() martini.Handler {
+	return func(res http.ResponseWriter, req *http.Request, c martini.Context, log *logrus.Logger) {
+		start := time.Now()
+
+		log.WithFields(logrus.Fields{
+			"method": req.Method,
+			"path":   req.URL.Path,
+			"time":   time.Since(start),
+		}).Info("Started a request")
+
+		c.Next()
+		rw := res.(martini.ResponseWriter)
+
+		log.WithFields(logrus.Fields{
+			"method": req.Method,
+			"path":   req.URL.Path,
+			"status": rw.Status(),
+			"time":   time.Since(start),
+		}).Info("Completed a request")
+	}
+}
+
+func dynamiqMartini() *martini.ClassicMartini {
+	r := martini.NewRouter()
+	m := martini.New()
+
+	m.Map(logrus.New())
+	m.Use(logrusLogger())
+	m.Use(martini.Recovery())
+	m.Use(martini.Static("public"))
+	m.MapTo(r, (*martini.Routes)(nil))
+	m.Action(r.Handle)
+	return &martini.ClassicMartini{m, r}
+}
+
 func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
 	// also tieing topics this is next for refactor
 	topics := InitTopics(cfg, queues)
-	m := martini.Classic()
+	m := dynamiqMartini()
 	m.Use(render.Renderer())
 
 	// STATUS / STATISTICS API BLOCK
@@ -123,7 +159,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			// We really need a proper way to generalize error handling
 			// Writing this out every time is going to be silly
 			if err != nil {
-				log.Println(err)
+				logrus.Println(err)
 				r.JSON(500, map[string]interface{}{"error": err.Error()})
 				return
 			}
@@ -132,7 +168,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		if configRequest.MinPartitions != nil {
 			err = cfg.SetMinPartitions(params["queue"], *configRequest.MinPartitions)
 			if err != nil {
-				log.Println(err)
+				logrus.Println(err)
 				r.JSON(500, map[string]interface{}{"error": err.Error()})
 				return
 			}
@@ -141,7 +177,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		if configRequest.MaxPartitions != nil {
 			err = cfg.SetMaxPartitions(params["queue"], *configRequest.MaxPartitions)
 			if err != nil {
-				log.Println(err)
+				logrus.Println(err)
 				r.JSON(500, map[string]interface{}{"error": err.Error()})
 				return
 			}
@@ -149,7 +185,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		if configRequest.MaxPartitionAge != nil {
 			err = cfg.SetMaxPartitionAge(params["queue"], *configRequest.MaxPartitionAge)
 			if err != nil {
-				log.Println(err)
+				logrus.Println(err)
 				r.JSON(500, map[string]interface{}{"error": err.Error()})
 				return
 			}
@@ -227,7 +263,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
 			if err != nil {
 				//log the error for unparsable input
-				log.Println(err)
+				logrus.Println(err)
 				r.JSON(422, err.Error())
 			}
 			messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
@@ -244,7 +280,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				messageList = append(messageList, message)
 			}
 			if err != nil {
-				log.Println(err)
+				logrus.Println(err)
 				r.JSON(204, err.Error())
 			} else {
 				r.JSON(200, messageList)
@@ -284,5 +320,5 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 
 	// DATA INTERACTION API BLOCK
 
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
+	logrus.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
 }

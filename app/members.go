@@ -1,8 +1,8 @@
 package app
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/hashicorp/memberlist"
-	"log"
 	"strconv"
 )
 
@@ -13,11 +13,11 @@ func InitMember(cfg *Config) *memberlist.Memberlist {
 
 	list, err := memberlist.Create(memberConf)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 	list.Join([]string{(cfg.Core.SeedServer + ":" + strconv.Itoa(cfg.Core.SeedPort))})
 	for _, member := range list.Members() {
-		log.Printf("Member: %s %s\n", member.Name, member.Addr)
+		logrus.Printf("Member: %s %s\n", member.Name, member.Addr)
 	}
 	return list
 }
