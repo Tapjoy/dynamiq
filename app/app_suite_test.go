@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app"
 	"github.com/hashicorp/memberlist"
 	. "github.com/onsi/ginkgo"
@@ -8,7 +9,6 @@ import (
 	"github.com/tpjg/goriakpbc"
 	"github.com/tpjg/goriakpbc/pb"
 	"io/ioutil"
-	"log"
 	"testing"
 	"time"
 )
@@ -70,7 +70,7 @@ var _ = BeforeSuite(func() {
 	memberList = app.InitMember(cfg)
 
 	// Disable log output during tests
-	log.SetOutput(ioutil.Discard)
+	logrus.SetOutput(ioutil.Discard)
 })
 
 var _ = AfterSuite(func() {

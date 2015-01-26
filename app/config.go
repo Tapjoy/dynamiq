@@ -4,9 +4,9 @@ import (
 	"code.google.com/p/gcfg"
 	"errors"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/tpjg/goriakpbc"
-	"log"
 	"math/rand"
 	"strconv"
 	"time"
@@ -46,6 +46,8 @@ type Core struct {
 	RiakNodes             string
 	BackendConnectionPool int
 	SyncConfigInterval    time.Duration
+	LogLevel              logrus.Level
+	LogLevelString        string
 }
 
 type Stats struct {
@@ -69,7 +71,7 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 	var cfg Config
 	err := gcfg.ReadFileInto(&cfg, *config_file)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	cfg.RiakPool = initRiakPool(&cfg)
@@ -79,6 +81,11 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 		cfg.Stats.Client = stats.NewStatsdClient(cfg.Stats.Address, cfg.Stats.Prefix, time.Second*time.Duration(cfg.Stats.FlushInterval))
 	default:
 		cfg.Stats.Client = stats.NewNOOPClient()
+	}
+
+	cfg.Core.LogLevel, err = logrus.ParseLevel(cfg.Core.LogLevelString)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 
 	go cfg.Queues.syncConfig(&cfg)
