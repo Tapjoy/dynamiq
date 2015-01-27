@@ -85,9 +85,9 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	m.Delete("/topics/:topic", func(r render.Render, params martini.Params) {
 		var present bool
 		_, present = topics.TopicMap[params["topic"]]
-		if present != true {
-			topics.InitTopic(params["topic"])
-			r.JSON(200, map[string]interface{}{"Deleted": topics.DeleteTopic(params["topic"])})
+		if present == true {
+			deleted := topics.DeleteTopic(params["topic"])
+			r.JSON(200, map[string]interface{}{"Deleted": deleted})
 		} else {
 			r.JSON(422, map[string]interface{}{"error": "Topic did not exist."})
 		}
