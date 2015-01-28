@@ -85,11 +85,11 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	m.Delete("/topics/:topic", func(r render.Render, params martini.Params) {
 		var present bool
 		_, present = topics.TopicMap[params["topic"]]
-		if present != true {
-			topics.InitTopic(params["topic"])
-			r.JSON(200, map[string]interface{}{"Deleted": topics.DeleteTopic(params["topic"])})
+		if present == true {
+			deleted := topics.DeleteTopic(params["topic"])
+			r.JSON(200, map[string]interface{}{"Deleted": deleted})
 		} else {
-			r.JSON(422, map[string]interface{}{"error": "Topic did not exist."})
+			r.JSON(404, map[string]interface{}{"error": "Topic did not exist."})
 		}
 	})
 
@@ -98,7 +98,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		_, present = queues.QueueMap[params["queue"]]
 		if present != true {
 			cfg.InitializeQueue(params["queue"])
-			r.JSON(200, "ok")
+			r.JSON(201, "created")
 		} else {
 			r.JSON(422, map[string]interface{}{"error": "Queue already exists."})
 		}
@@ -109,7 +109,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		_, present = topics.TopicMap[params["topic"]]
 		if present != true {
 			topics.InitTopic(params["topic"])
-			r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
+			r.JSON(201, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 		} else {
 			r.JSON(422, map[string]interface{}{"error": "Topic already exists."})
 		}
@@ -251,7 +251,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 			r.JSON(200, queueReturn)
 		} else {
-			r.JSON(204, fmt.Sprintf("There is no queue named %s", params["queue"]))
+			r.JSON(404, fmt.Sprintf("There is no queue named %s", params["queue"]))
 		}
 	})
 
@@ -268,7 +268,7 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 			messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
 			if err != nil {
-				r.JSON(204, err.Error())
+				r.JSON(500, err.Error())
 			}
 			//TODO move this into the Queue.Get code
 			messageList := make([]map[string]interface{}, 0, 10)
@@ -281,13 +281,13 @@ func InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 			if err != nil {
 				logrus.Println(err)
-				r.JSON(204, err.Error())
+				r.JSON(500, err.Error())
 			} else {
 				r.JSON(200, messageList)
 			}
 		} else {
 			// What is a sane result here?
-			r.JSON(204, fmt.Sprintf("There is no queue named %s", params["queue"]))
+			r.JSON(404, fmt.Sprintf("There is no queue named %s", params["queue"]))
 		}
 	})
 
