@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-const API_VERSION = "v1"
-
 // TODO Should this live in the config package?
 // Using pointers lets us differentiate between a natural 0, and an int-default 0
 // omitempty tells it to ignore anything where the name was provided, but an empty value
