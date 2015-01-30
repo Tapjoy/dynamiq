@@ -20,5 +20,7 @@ func main() {
 
 	list := app.InitMember(cfg)
 
-	app.InitWebserver(list, cfg)
+	http_api := app.HTTP_API_V1{}
+
+	http_api.InitWebserver(list, cfg)
 }

@@ -233,15 +233,15 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 
 func (queues *Queues) syncConfig(cfg *Config) {
 	for {
-		logrus.Println("syncing Queue config with Riak")
+		logrus.Debug("syncing Queue config with Riak")
 		client := cfg.RiakConnection()
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
 			// This is likely caused by a network blip against the riak node, or the node being down
 			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 			// skip this iteration of the config sync, and try again at the next interval
-			logrus.Println("There was an error attempting to read the from the configuration bucket")
-			logrus.Println(err)
+			logrus.Error("There was an error attempting to read the from the configuration bucket")
+			logrus.Error(err)
 			//cfg.ResetRiakConnection()
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 			continue
@@ -256,8 +256,8 @@ func (queues *Queues) syncConfig(cfg *Config) {
 				// This is likely caused by a network blip against the riak node, or the node being down
 				// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 				// skip this iteration of the config sync, and try again at the next interval
-				logrus.Println("There was an error attempting to read from the queue configuration map in the configuration bucket")
-				logrus.Println(err)
+				logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
+				logrus.Error(err)
 				//cfg.ResetRiakConnection()
 				time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 				continue
