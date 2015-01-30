@@ -28,11 +28,11 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("maps", "config")
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	config, err := bucket.FetchMap("topicsConfig")
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	if config.FetchSet("topics") == nil {
 		topicSet := config.AddSet("topics")
@@ -41,7 +41,7 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 		err = config.Store()
 	}
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	topics := Topics{
 		Config:   config,
@@ -101,7 +101,7 @@ func (topic *Topic) AddQueue(cfg *Config, name string) {
 	topic.Config.Store()
 	topic.Config, err = bucket.FetchMap(recordName)
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 }
 
@@ -140,7 +140,7 @@ func (topics Topics) DeleteTopic(name string) bool {
 	topics.TopicMap[name].Delete()
 	delete(topics.TopicMap, name)
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 		return false
 	} else {
 		return true
@@ -160,7 +160,7 @@ func (topic *Topic) Delete() {
 //TODO move error handling for empty config in riak to initializer
 func (topics *Topics) syncConfig(cfg *Config) {
 	for {
-		logrus.Println("syncing Topic config with Riak")
+		logrus.Debug("syncing Topic config with Riak")
 		//refresh the topic RDtMap
 		client := topics.riakPool
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -168,8 +168,8 @@ func (topics *Topics) syncConfig(cfg *Config) {
 			// This is likely caused by a network blip against the riak node, or the node being down
 			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 			// skip this iteration of the config sync, and try again at the next interval
-			logrus.Println("There was an error attempting to read the from the configuration bucket")
-			logrus.Println(err)
+			logrus.Error("There was an error attempting to read the from the configuration bucket")
+			logrus.Error(err)
 			//cfg.ResetRiakConnection()
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 			continue
@@ -182,8 +182,8 @@ func (topics *Topics) syncConfig(cfg *Config) {
 			// This is likely caused by a network blip against the riak node, or the node being down
 			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 			// skip this iteration of the config sync, and try again at the next interval
-			logrus.Println("There was an error attempting to read from the queue configuration map in the configuration bucket")
-			logrus.Println(err)
+			logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
+			logrus.Error(err)
 			//cfg.ResetRiakConnection()
 			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
 			continue
