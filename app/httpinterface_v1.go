@@ -270,7 +270,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
 				if err != nil {
 					//log the error for unparsable input
-					logrus.Println(err)
+					logrus.Error(err)
 					r.JSON(422, err.Error())
 				}
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
@@ -287,7 +287,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					messageList = append(messageList, message)
 				}
 				if err != nil {
-					logrus.Println(err)
+					logrus.Error(err)
 					r.JSON(500, err.Error())
 				} else {
 					r.JSON(200, messageList)

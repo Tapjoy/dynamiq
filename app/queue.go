@@ -107,7 +107,7 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	set := m.AddSet(QUEUE_SET_NAME)
 
 	for _, value := range set.GetValue() {
-		logrus.Printf("Looking for %s, found %s", queueName, string(value[:]))
+		logrus.Debug("Looking for %s, found %s", queueName, string(value[:]))
 		if string(value[:]) == queueName {
 			return true
 		}
@@ -123,7 +123,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	//set the bucket
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err != nil {
-		logrus.Printf("Error%v", err)
+		logrus.Error(err)
 		return nil, err
 	}
 
@@ -138,7 +138,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 	defer queue.setQueueDepthApr(cfg.Stats.Client, list, queue.Name, messageIds)
 
 	if err != nil {
-		logrus.Printf("Error%v", err)
+		logrus.Error(err)
 	}
 	messageCount := len(messageIds)
 	// return the partition to the parts heap, but only lock it when we have messages
@@ -148,7 +148,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
 	}
 	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, int64(messageCount))
-	logrus.Println("Message retrieved ", messageCount)
+	logrus.Debug("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
 }
 
@@ -188,7 +188,7 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 		}
 	}
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	// if we got here we're borked
 	// TODO stats cleanup? Possibility that this gets us out of sync
@@ -201,20 +201,16 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rKeys = make(chan string, len(ids))
 
 	start := time.Now()
-	//fmt.Println("In get multi")
+
 	for i := 0; i < len(ids); i++ {
 		go func() {
 			var riakKey string
 			client := cfg.RiakConnection()
-			//fmt.Println("Getting bucket")
 			bucket, _ := client.NewBucketType("messages", queue.Name)
 			riakKey = <-rKeys
-			//fmt.Println("Getting value")
 			rObject, _ := bucket.Get(riakKey)
 
 			rObjectArrayChan <- []riak.RObject{*rObject}
-
-			//fmt.Println("Returning value")
 		}()
 		rKeys <- ids[i]
 	}
@@ -227,7 +223,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		}
 	}
 	elapsed := time.Since(start)
-	logrus.Printf("Get Multi Took %s\n", elapsed)
+	logrus.Debugf("Get Multi Took %s\n", elapsed)
 	return returnVals
 }
 

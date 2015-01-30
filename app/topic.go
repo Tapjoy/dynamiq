@@ -28,11 +28,11 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("maps", "config")
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	config, err := bucket.FetchMap("topicsConfig")
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	if config.FetchSet("topics") == nil {
 		topicSet := config.AddSet("topics")
@@ -41,7 +41,7 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 		err = config.Store()
 	}
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 	topics := Topics{
 		Config:   config,
@@ -101,7 +101,7 @@ func (topic *Topic) AddQueue(cfg *Config, name string) {
 	topic.Config.Store()
 	topic.Config, err = bucket.FetchMap(recordName)
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 }
 
@@ -140,7 +140,7 @@ func (topics Topics) DeleteTopic(name string) bool {
 	topics.TopicMap[name].Delete()
 	delete(topics.TopicMap, name)
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 		return false
 	} else {
 		return true
