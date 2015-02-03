@@ -44,9 +44,12 @@ type Queue struct {
 	sync.RWMutex
 }
 
-func recordFillDelta(c stats.StatsClient, queueName string, fillDelta int64) error {
+func recordFillDelta(c stats.StatsClient, queueName string, batchSize int64, messageCount int64) error {
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_FILLDELTA_STATS_SUFFIX)
-	return c.SetGauge(key, fillDelta)
+	// We need the division to use floats as go does not supporting int/int returning an int
+	// Multiply by 100 to return a whole number, round down because we don't care about that much precision
+	rate := int64(math.Floor((float64(batchSize-messageCount) / float64(messageCount)) * 100))
+	return c.SetGauge(key, rate)
 }
 
 func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
@@ -122,7 +125,7 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 }
 
 // get a message from the queue
-func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint32) ([]riak.RObject, error) {
+func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int64) ([]riak.RObject, error) {
 	// grab a riak client
 	client := cfg.RiakConnection()
 
@@ -140,21 +143,23 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 		return nil, err
 	}
 	//get a list of batchsize message ids
-	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.Itoa(partBottom), strconv.Itoa(partTop), batchsize, "")
+	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.Itoa(partBottom), strconv.Itoa(partTop), uint32(batchsize), "")
 	defer queue.setQueueDepthApr(cfg.Stats.Client, list, queue.Name, messageIds)
 
 	if err != nil {
 		logrus.Error(err)
 	}
-	messageCount := len(messageIds)
+	// We need it as 64 for stats reporting
+	messageCount := int64(len(messageIds))
+
 	// return the partition to the parts heap, but only lock it when we have messages
 	if messageCount > 0 {
 		defer queue.Parts.PushPartition(cfg, queue.Name, partition, true)
 	} else {
 		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
 	}
-	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, int64(messageCount))
-	defer recordFillDelta(cfg.Stats.Client, queueName, messageCount-batchsize)
+	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, messageCount)
+	defer recordFillDelta(cfg.Stats.Client, queue.Name, batchsize, messageCount)
 	logrus.Debug("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
 }

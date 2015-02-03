@@ -265,13 +265,13 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			var present bool
 			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
-				batchSize, err := strconv.ParseUint(params["batchSize"], 10, 32)
+				batchSize, err := strconv.ParseInt(params["batchSize"], 10, 64)
 				if err != nil {
 					//log the error for unparsable input
 					logrus.Error(err)
 					r.JSON(422, err.Error())
 				}
-				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, uint32(batchSize))
+				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
 				if err != nil {
 					r.JSON(500, err.Error())
 				}
