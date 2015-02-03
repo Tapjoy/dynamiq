@@ -44,7 +44,7 @@ type Queue struct {
 	sync.RWMutex
 }
 
-func recordFillDelta(c stats.StatsClient, queueName string, batchSize int64, messageCount int64) error {
+func recordFillRatio(c stats.StatsClient, queueName string, batchSize int64, messageCount int64) error {
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_FILLDELTA_STATS_SUFFIX)
 	// We need the division to use floats as go does not supporting int/int returning an int
 	// Multiply by 100 to return a whole number, round down because we don't care about that much precision
@@ -159,7 +159,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int6
 		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
 	}
 	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, messageCount)
-	defer recordFillDelta(cfg.Stats.Client, queue.Name, batchsize, messageCount)
+	defer recordFillRatio(cfg.Stats.Client, queue.Name, batchsize, messageCount)
 	logrus.Debug("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
 }
