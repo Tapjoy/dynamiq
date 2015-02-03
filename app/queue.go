@@ -21,6 +21,7 @@ const QUEUE_DELETED_STATS_SUFFIX = "deleted.count"
 const QUEUE_DEPTH_STATS_SUFFIX = "depth.count"
 const QUEUE_INFLIGHT_STATS_SUFFIX = "inflight.count"
 const QUEUE_DEPTHAPR_STATS_SUFFIX = "approximate_depth.count"
+const QUEUE_FILLDELTA_STATS_SUFFIX = "fill.count"
 
 type Queues struct {
 	// a container for all queues
@@ -41,6 +42,11 @@ type Queue struct {
 	Config *riak.RDtMap
 	// Mutex for protecting rw access to the Config object
 	sync.RWMutex
+}
+
+func recordFillDelta(c stats.StatsClient, queueName string, fillDelta int64) error {
+	key := fmt.Sprintf("%s.%s", queueName, QUEUE_FILLDELTA_STATS_SUFFIX)
+	return c.SetGauge(key, fillDelta)
 }
 
 func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
@@ -148,6 +154,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize uint
 		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
 	}
 	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, int64(messageCount))
+	defer recordFillDelta(cfg.Stats.Client, queueName, messageCount-batchsize)
 	logrus.Debug("Message retrieved ", messageCount)
 	return queue.RetrieveMessages(messageIds, cfg), err
 }
