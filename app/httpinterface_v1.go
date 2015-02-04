@@ -271,6 +271,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					logrus.Error(err)
 					r.JSON(422, err.Error())
 				}
+				if batchSize <= 0 {
+					r.JSON(422, fmt.Sprint("Batchsizes must be non-negative integers greater than 0"))
+				}
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
 				if err != nil {
 					r.JSON(500, err.Error())
