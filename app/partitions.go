@@ -50,7 +50,7 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	nodeTop := (nodePosition + 1) * step
 	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
 	if err != nil {
-		logrus.Println(err)
+		logrus.Error(err)
 	}
 
 	// calculate my range for the given number
