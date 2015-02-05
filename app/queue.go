@@ -178,6 +178,8 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 
 		messageObj := bucket.NewObject(uuid)
 		messageObj.Indexes["id_int"] = []string{uuid}
+		// THIS NEEDS TO BE CONFIGURABLE
+		messageObj.ContentType = "application/json"
 		messageObj.Data = []byte(message)
 		messageObj.Store()
 
@@ -214,21 +216,35 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rKeys = make(chan string, len(ids))
 
 	start := time.Now()
-
+	// foreach message id we have
 	for i := 0; i < len(ids); i++ {
+		// Kick off a go routine
 		go func() {
 			var riakKey string
 			client := cfg.RiakConnection()
 			bucket, _ := client.NewBucketType("messages", queue.Name)
+			// Pop a key off the rKeys channel
 			riakKey = <-rKeys
-			rObject, _ := bucket.Get(riakKey)
-
-			rObjectArrayChan <- []riak.RObject{*rObject}
+			rObject, err := bucket.Get(riakKey)
+			if err != nil {
+				// This is likely an object not found error, which we get from dupes as partitions resize while
+				// messages are being deleted (happens on new queues, or under any condition triggering a resize)
+				// Thats why it's debug, not error - it's expected in certain conditions, based on how the underlying
+				// library works
+				logrus.Debug(err)
+			} else {
+				// If we didn't get an error, push the riak object into the objectarray channel
+				rObjectArrayChan <- []riak.RObject{*rObject}
+			}
 		}()
+		// Push the id into the rKeys channel
 		rKeys <- ids[i]
 	}
 	returnVals := make([]riak.RObject, 0)
+
+	// TODO find a better mechanism than 2 loops?
 	for i := 0; i < len(ids); i++ {
+		// While the above go-rountes are running, just start popping off the channel as available
 		var rObjectArray = <-rObjectArrayChan
 		//If the key isn't blank, we've got a meaningful object to deal with
 		if len(rObjectArray) == 1 {

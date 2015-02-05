@@ -300,8 +300,6 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		})
 
 		m.Put("/queues/:queue/message", func(params martini.Params, req *http.Request) string {
-			logrus.Debug("Header")
-			logrus.Debug(req.Header.Get("Content-Type"))
 			var present bool
 			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
