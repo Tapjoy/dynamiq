@@ -231,10 +231,9 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 				// Thats why it's debug, not error - it's expected in certain conditions, based on how the underlying
 				// library works
 				logrus.Debug(err)
-			} else {
 				// If we didn't get an error, push the riak object into the objectarray channel
-				rObjectArrayChan <- *rObject
 			}
+			rObjectArrayChan <- *rObject
 		}()
 		// Push the id into the rKeys channel
 		rKeys <- ids[i]
