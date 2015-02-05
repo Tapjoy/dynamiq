@@ -49,7 +49,6 @@ func recordFillRatio(c stats.StatsClient, queueName string, batchSize int64, mes
 	// We need the division to use floats as go does not supporting int/int returning an int
 	// Multiply by 100 to return a whole number, round down because we don't care about that much precision
 	rate := int64(math.Floor((float64(messageCount) / float64(batchSize)) * 100))
-	logrus.Debugf("The batch size was %d, the messagecount was %d, the fillrate with %d", batchSize, messageCount, rate)
 	return c.SetGauge(key, rate)
 }
 
