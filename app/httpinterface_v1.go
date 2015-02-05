@@ -276,6 +276,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
 
 				if err != nil && err.Error() != NOPARTITIONS {
+					// We're choosing to ignore nopartitions issues for now and treat them as normal 200s
+					// The only other error this could be is a riak related error but we're not going to
+					// change the API at this point. Will review this during a future release
 					r.JSON(204, err.Error())
 				}
 				//TODO move this into the Queue.Get code
