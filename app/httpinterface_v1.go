@@ -222,7 +222,6 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		})
 
 		m.Put("/topics/:topic/message", func(r render.Render, params martini.Params, req *http.Request) {
-
 			var present bool
 			_, present = topics.TopicMap[params["topic"]]
 			if present != true {
@@ -275,8 +274,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					r.JSON(422, fmt.Sprint("Batchsizes must be non-negative integers greater than 0"))
 				}
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
+
 				if err != nil {
-					r.JSON(500, err.Error())
+					r.JSON(204, err.Error())
 				}
 				//TODO move this into the Queue.Get code
 				messageList := make([]map[string]interface{}, 0, 10)
@@ -300,6 +300,8 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		})
 
 		m.Put("/queues/:queue/message", func(params martini.Params, req *http.Request) string {
+			logrus.Debug("Header")
+			logrus.Debug(req.Header.Get("Content-Type"))
 			var present bool
 			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
