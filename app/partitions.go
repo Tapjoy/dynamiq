@@ -51,7 +51,7 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	nodeBottom := nodePosition * step
 	nodeTop := (nodePosition + 1) * step
 	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
-	if err != nil {
+	if err != nil && err.Error() != NOPARTITIONS {
 		logrus.Error(err)
 	}
 
