@@ -275,7 +275,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				}
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
 
-				if err != nil {
+				if err != nil && err.Error() != NOPARTITIONS {
 					r.JSON(204, err.Error())
 				}
 				//TODO move this into the Queue.Get code
@@ -287,7 +287,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					message["body"] = string(object.Data[:])
 					messageList = append(messageList, message)
 				}
-				if err != nil {
+				if err != nil && err.Error() != NOPARTITIONS {
 					logrus.Error(err)
 					r.JSON(500, err.Error())
 				} else {
