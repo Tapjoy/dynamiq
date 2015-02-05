@@ -211,7 +211,7 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 
 // helpers
 func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
-	var rObjectArrayChan = make(chan []riak.RObject, len(ids))
+	var rObjectArrayChan = make(chan riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
 	start := time.Now()
@@ -233,7 +233,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 				logrus.Debug(err)
 			} else {
 				// If we didn't get an error, push the riak object into the objectarray channel
-				rObjectArrayChan <- []riak.RObject{*rObject}
+				rObjectArrayChan <- *rObject
 			}
 		}()
 		// Push the id into the rKeys channel
@@ -244,10 +244,10 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	// TODO find a better mechanism than 2 loops?
 	for i := 0; i < len(ids); i++ {
 		// While the above go-rountes are running, just start popping off the channel as available
-		var rObjectArray = <-rObjectArrayChan
+		var rObject = <-rObjectArrayChan
 		//If the key isn't blank, we've got a meaningful object to deal with
-		if len(rObjectArray) == 1 {
-			returnVals = append(returnVals, rObjectArray[0])
+		if len(rObject.Data) > 0 {
+			returnVals = append(returnVals, rObject)
 		}
 	}
 	elapsed := time.Since(start)
