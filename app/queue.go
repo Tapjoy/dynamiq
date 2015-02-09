@@ -49,7 +49,6 @@ func recordFillRatio(c stats.StatsClient, queueName string, batchSize int64, mes
 	// We need the division to use floats as go does not supporting int/int returning an int
 	// Multiply by 100 to return a whole number, round down because we don't care about that much precision
 	rate := int64(math.Floor((float64(messageCount) / float64(batchSize)) * 100))
-	logrus.Debugf("The batch size was %d, the messagecount was %d, the fillrate with %d", batchSize, messageCount, rate)
 	return c.SetGauge(key, rate)
 }
 
@@ -178,6 +177,8 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 
 		messageObj := bucket.NewObject(uuid)
 		messageObj.Indexes["id_int"] = []string{uuid}
+		// THIS NEEDS TO BE CONFIGURABLE
+		messageObj.ContentType = "application/json"
 		messageObj.Data = []byte(message)
 		messageObj.Store()
 
@@ -210,29 +211,42 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 
 // helpers
 func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
-	var rObjectArrayChan = make(chan []riak.RObject, len(ids))
+	var rObjectArrayChan = make(chan riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
 	start := time.Now()
-
+	// foreach message id we have
 	for i := 0; i < len(ids); i++ {
+		// Kick off a go routine
 		go func() {
 			var riakKey string
 			client := cfg.RiakConnection()
 			bucket, _ := client.NewBucketType("messages", queue.Name)
+			// Pop a key off the rKeys channel
 			riakKey = <-rKeys
-			rObject, _ := bucket.Get(riakKey)
-
-			rObjectArrayChan <- []riak.RObject{*rObject}
+			rObject, err := bucket.Get(riakKey)
+			if err != nil {
+				// This is likely an object not found error, which we get from dupes as partitions resize while
+				// messages are being deleted (happens on new queues, or under any condition triggering a resize)
+				// Thats why it's debug, not error - it's expected in certain conditions, based on how the underlying
+				// library works
+				logrus.Debug(err)
+				// If we didn't get an error, push the riak object into the objectarray channel
+			}
+			rObjectArrayChan <- *rObject
 		}()
+		// Push the id into the rKeys channel
 		rKeys <- ids[i]
 	}
 	returnVals := make([]riak.RObject, 0)
+
+	// TODO find a better mechanism than 2 loops?
 	for i := 0; i < len(ids); i++ {
-		var rObjectArray = <-rObjectArrayChan
+		// While the above go-rountes are running, just start popping off the channel as available
+		var rObject = <-rObjectArrayChan
 		//If the key isn't blank, we've got a meaningful object to deal with
-		if len(rObjectArray) == 1 {
-			returnVals = append(returnVals, rObjectArray[0])
+		if len(rObject.Data) > 0 {
+			returnVals = append(returnVals, rObject)
 		}
 	}
 	elapsed := time.Since(start)

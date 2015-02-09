@@ -222,7 +222,6 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		})
 
 		m.Put("/topics/:topic/message", func(r render.Render, params martini.Params, req *http.Request) {
-
 			var present bool
 			_, present = topics.TopicMap[params["topic"]]
 			if present != true {
@@ -275,8 +274,12 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					r.JSON(422, fmt.Sprint("Batchsizes must be non-negative integers greater than 0"))
 				}
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
-				if err != nil {
-					r.JSON(500, err.Error())
+
+				if err != nil && err.Error() != NOPARTITIONS {
+					// We're choosing to ignore nopartitions issues for now and treat them as normal 200s
+					// The only other error this could be is a riak related error but we're not going to
+					// change the API at this point. Will review this during a future release
+					r.JSON(204, err.Error())
 				}
 				//TODO move this into the Queue.Get code
 				messageList := make([]map[string]interface{}, 0, 10)
@@ -287,7 +290,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					message["body"] = string(object.Data[:])
 					messageList = append(messageList, message)
 				}
-				if err != nil {
+				if err != nil && err.Error() != NOPARTITIONS {
 					logrus.Error(err)
 					r.JSON(500, err.Error())
 				} else {

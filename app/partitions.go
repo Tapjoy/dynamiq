@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const NOPARTITIONS string = "no available partitions"
+
 type Partitions struct {
 	partitions     *lane.PQueue
 	partitionCount int
@@ -49,8 +51,8 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	nodeBottom := nodePosition * step
 	nodeTop := (nodePosition + 1) * step
 	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
-	if err != nil {
-		logrus.Println(err)
+	if err != nil && err.Error() != NOPARTITIONS {
+		logrus.Error(err)
 	}
 
 	// calculate my range for the given number
@@ -92,7 +94,7 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 		workingPartition = poppedPartition.(*Partition)
 	} else {
 		// this seems a little scary
-		return myPartition, workingPartition, part.partitionCount, errors.New("no available partitions")
+		return myPartition, workingPartition, part.partitionCount, errors.New(NOPARTITIONS)
 	}
 	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
 	if time.Since(workingPartition.LastUsed).Seconds() > visTimeout {
@@ -107,7 +109,7 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 			myPartition = workingPartition.Id
 			part.partitionCount = part.partitionCount + 1
 		} else {
-			err = errors.New("no available partitions")
+			err = errors.New(NOPARTITIONS)
 		}
 		part.Unlock()
 	}
