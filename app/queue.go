@@ -244,6 +244,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		}
 	}
 	elapsed := time.Since(start)
+	logrus.Debugf("Get Multi attempted to lookup %d messages, actually returning %d messages", len(ids), len(returnVals))
 	logrus.Debugf("Get Multi Took %s\n", elapsed)
 	return returnVals
 }
