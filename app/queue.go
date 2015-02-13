@@ -262,7 +262,9 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 			}
 			// delete the object
 			err := rObject.Destroy()
-                        logrus.Error(err)
+                        if err != nil {
+                          logrus.Error(err)
+                        }
 		}
 	}
 	elapsed := time.Since(start)
