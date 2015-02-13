@@ -250,7 +250,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		}
 		//Read Repair any sibling objects
 		if rObject.Conflict() {
-			for _, sibling := range obj.Siblings {
+			for _, sibling := range rObject.Siblings {
 				if len(sibling.Data) > 0 {
 					queue.Put(cfg, sibling.Data)
 				} else {
