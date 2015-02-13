@@ -250,15 +250,15 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		}
 		//Read Repair any sibling objects
 		if rObject.Conflict() {
-			for i := 1; i < len(rObject.Siblings); i++ {
-				siblingMessage := rObject.Siblings[i].Data
-				if len(siblingMessage) > 0 {
-					queue.Put(cfg, siblingMessage)
+			for _, sibling := range obj.Siblings {
+				if len(sibling.Data) > 0 {
+					queue.Put(cfg, sibling.Data)
+				} else {
+					logrus.Debugf("sibling had no data")
 				}
 			}
-			// delete the other siblings
-			rObject.Siblings = rObject.Siblings[:1]
-			rObject.Store()
+			// delete the object
+			rObject.Destroy()
 		}
 	}
 	elapsed := time.Since(start)
