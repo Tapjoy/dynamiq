@@ -192,9 +192,10 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 		if err == nil {
 			defer decrementMessageCount(cfg.Stats.Client, queue.Name, 1)
 			return true
+		} else {
+			logrus.Error(err)
 		}
-	}
-	if err != nil {
+	} else {
 		logrus.Error(err)
 	}
 	// if we got here we're borked
