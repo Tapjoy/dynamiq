@@ -252,7 +252,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		if rObject.Conflict() {
 			for _, sibling := range rObject.Siblings {
 				if len(sibling.Data) > 0 {
-					queue.Put(cfg, sibling.Data)
+					queue.Put(cfg, string(sibling.Data))
 				} else {
 					logrus.Debugf("sibling had no data")
 				}
