@@ -1,13 +1,14 @@
 package app
 
 import (
+	"crypto/rand"
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
 	"math"
-	"math/rand"
+	"math/big"
 	"strconv"
 	"sync"
 	"time"
@@ -21,6 +22,8 @@ const QUEUE_DELETED_STATS_SUFFIX = "deleted.count"
 const QUEUE_DEPTH_STATS_SUFFIX = "depth.count"
 const QUEUE_DEPTHAPR_STATS_SUFFIX = "approximate_depth.count"
 const QUEUE_FILLDELTA_STATS_SUFFIX = "fill.count"
+
+var MAX_ID_SIZE = *big.NewInt(math.MaxInt64)
 
 type Queues struct {
 	// a container for all queues
@@ -164,9 +167,8 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		//Retrieve a UUID
-		rand.Seed(time.Now().UnixNano())
-		randInt := rand.Int63n(math.MaxInt64)
-		uuid := strconv.FormatInt(randInt, 10)
+		randy, _ := rand.Int(rand.Reader, &MAX_ID_SIZE)
+		uuid := randy.String()
 
 		messageObj := bucket.NewObject(uuid)
 		messageObj.Indexes["id_int"] = []string{uuid}
