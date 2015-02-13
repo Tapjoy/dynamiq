@@ -248,6 +248,18 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		if len(rObject.Data) > 0 {
 			returnVals = append(returnVals, rObject)
 		}
+		//Read Repair any sibling objects
+		if rObject.Conflict() {
+			for i := 1; i < len(rObject.Siblings); i++ {
+				siblingMessage := rObject.Siblings[i].Data
+				if len(siblingMessage) > 0 {
+					queue.Put(cfg, siblingMessage)
+				}
+			}
+			// delete the other siblings
+			rObject.Siblings = rObject.Siblings[:1]
+			rObject.Store()
+		}
 	}
 	elapsed := time.Since(start)
 	logrus.Debugf("Get Multi Took %s\n", elapsed)
