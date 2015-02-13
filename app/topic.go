@@ -74,16 +74,20 @@ func (topics *Topics) InitTopic(name string) {
 //Broadcast the message to all listening queues and return the acked writes
 func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 	queueWrites := make(map[string]string)
-	for _, queue := range topic.Config.FetchSet("queues").GetValue() {
-		//check if we've initialized this queue yet
-		var present bool
-		_, present = topic.queues.QueueMap[string(queue)]
-		if present == true {
-			uuid := topic.queues.QueueMap[string(queue)].Put(cfg, message)
-			queueWrites[string(queue)] = uuid
-		} else {
-			// Return something indicating no queue?
-			// SNS -> SQS would simply blindly accept the write and NOOP
+	// If we haven't mapped any queues to this topic yet, this will be nil
+	topicQueues := topic.Config.FetchSet("queues")
+	if topicQueues != nil {
+		for _, queue := range topicQueues.GetValue() {
+			//check if we've initialized this queue yet
+			var present bool
+			_, present = topic.queues.QueueMap[string(queue)]
+			if present == true {
+				uuid := topic.queues.QueueMap[string(queue)].Put(cfg, message)
+				queueWrites[string(queue)] = uuid
+			} else {
+				// Return something indicating no queue?
+				// SNS -> SQS would simply blindly accept the write and NOOP
+			}
 		}
 	}
 	return queueWrites

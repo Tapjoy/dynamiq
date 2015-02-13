@@ -19,7 +19,6 @@ const QUEUE_SENT_STATS_SUFFIX = "sent.count"
 const QUEUE_RECEIVED_STATS_SUFFIX = "received.count"
 const QUEUE_DELETED_STATS_SUFFIX = "deleted.count"
 const QUEUE_DEPTH_STATS_SUFFIX = "depth.count"
-const QUEUE_INFLIGHT_STATS_SUFFIX = "inflight.count"
 const QUEUE_DEPTHAPR_STATS_SUFFIX = "approximate_depth.count"
 const QUEUE_FILLDELTA_STATS_SUFFIX = "fill.count"
 
@@ -66,9 +65,6 @@ func decrementMessageCount(c stats.StatsClient, queueName string, numberOfMessag
 	// Increment # Deleted
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DELETED_STATS_SUFFIX)
 	err := c.Incr(key, numberOfMessages)
-	// Decrement Inflight count
-	key = fmt.Sprintf("%s.%s", queueName, QUEUE_INFLIGHT_STATS_SUFFIX)
-	err = c.DecrGauge(key, numberOfMessages)
 	// Decrement Depth count
 	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
 	err = c.DecrGauge(key, numberOfMessages)
@@ -79,9 +75,6 @@ func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessag
 	// Increment # Received
 	key := fmt.Sprintf("%s.%s", queueName, QUEUE_RECEIVED_STATS_SUFFIX)
 	err := c.Incr(key, numberOfMessages)
-	// Increment Inflight count
-	key = fmt.Sprintf("%s.%s", queueName, QUEUE_INFLIGHT_STATS_SUFFIX)
-	err = c.IncrGauge(key, numberOfMessages)
 	return err
 }
 func (queue *Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
@@ -199,9 +192,10 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 		if err == nil {
 			defer decrementMessageCount(cfg.Stats.Client, queue.Name, 1)
 			return true
+		} else {
+			logrus.Error(err)
 		}
-	}
-	if err != nil {
+	} else {
 		logrus.Error(err)
 	}
 	// if we got here we're borked
@@ -250,6 +244,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		}
 	}
 	elapsed := time.Since(start)
+	logrus.Debugf("Get Multi attempted to lookup %d messages, actually returning %d messages", len(ids), len(returnVals))
 	logrus.Debugf("Get Multi Took %s\n", elapsed)
 	return returnVals
 }
