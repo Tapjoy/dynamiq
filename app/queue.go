@@ -248,7 +248,10 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		if len(rObject.Data) > 0 {
 			returnVals = append(returnVals, rObject)
 		}
-		//Read Repair any sibling objects
+		// In the event of a key conflict ( due to multiple messages receiving the same id from Random )
+                // we need to Read Repair the object into multiple independent messages
+                // the following code reads any siblings, and re-puts them onto the queue
+                // then deletes the conflicted object
 		if rObject.Conflict() {
 			for _, sibling := range rObject.Siblings {
 				if len(sibling.Data) > 0 {
@@ -258,7 +261,8 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 				}
 			}
 			// delete the object
-			rObject.Destroy()
+			err := rObject.Destroy()
+                        logrus.Error(err)
 		}
 	}
 	elapsed := time.Since(start)
