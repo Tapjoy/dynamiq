@@ -42,7 +42,6 @@ func (part *Partitions) PartitionCount() int {
 	return part.partitionCount
 }
 func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, *Partition, error) {
-
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
 
@@ -102,16 +101,16 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 	} else {
 		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 		part.Lock()
+		defer part.Unlock()
 		maxPartitions, _ := cfg.GetMaxPartitions(queueName)
 		if part.partitionCount < maxPartitions {
-			workingPartition := new(Partition)
+			workingPartition = new(Partition)
 			workingPartition.Id = part.partitionCount
 			myPartition = workingPartition.Id
 			part.partitionCount = part.partitionCount + 1
 		} else {
 			err = errors.New(NOPARTITIONS)
 		}
-		part.Unlock()
 	}
 	return myPartition, workingPartition, part.partitionCount, err
 }
