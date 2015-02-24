@@ -6,7 +6,12 @@ set -e
 mkdir -p build
 cd build
 export GOPATH=`pwd`
-go get github.com/Tapjoy/dynamiq
+export GITBRANCH=`git branch | grep '*' | grep -Eo '[^ ]*$'`
+go get -d github.com/Tapjoy/dynamiq
+cd src/github.com/Tapjoy/dynamiq
+git checkout -b $GITBRANCH
+cd ../../../../
+go install github.com/Tapjoy/dynamiq
 cd ..
 cp build/bin/dynamiq ./dynamiq
 rm -rf build app dynamiq.go README.md
