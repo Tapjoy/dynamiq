@@ -135,15 +135,13 @@ PUT)
 
 GET)
   
-  1. 2i query for all inflight messages ( limit 10000 )
-  2. 2i query for 10 messages in the bucket
-  3. Outer join the lists in 1 & 2 to find messages that are not inflight
-  4. Add a 2i index to the message with the present timestamp for "inflight"
-  5. Serve the message
+  1. Return the least recently used, unlocked partition for the requested queue
+  2. 2i query for X messages in the bucket, where X is your provided batch size, within the range of the retrieved partition
+  3. Serve the messages
   
 DELETE)
 
-  1. delete the message matching the inbound uuid
+  1. Delete the message matching the inbound uuid
 
 Client Libraries
 ================
@@ -175,6 +173,7 @@ PATCH /queues/{queue_name} currently accepts the following fields
 * visibility_timeout : The amount of time a partition should be considered "locked" to prevent it from serving duplicate messages too quickly
 * min_partitions : The minimum number of slices of the keyspace this queue should have, spread across all nodes in the cluster. For high-throughput queues, you'll want to keep this number high, and always below the maximum
 * max_partitions : The maximum number of slices of keyspace this queue should have, spread across all nodes in the cluster. For high-throughput queues, you'll want to keep this number high, and always above the minimum
+* max_partition_age : The maximum amount of time in seconds a Partition should be allowed to exist after it has last been accessed. This is to help Dynamiq tune the number of Partitions automatically. Continually accessed Partitions will never expire.
 
 Changing any of these values will result in an immediate write to Riak ensuring the data is persisted, however the individual Dynamiq nodes (including the node you issued the request to) will not have their in memory configuration updated until the next "Sync" with Riak.
 
