@@ -120,6 +120,18 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	return false
 }
 
+func (queues Queues) DeleteQueue(name string, cfg *Config) bool {
+	client := cfg.RiakConnection()
+
+	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	config, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	config.FetchSet("queues").Remove([]byte(name))
+	config.Store()
+
+	//return true if queue doesn't exist anymore
+	return !queues.Exists(cfg, name)
+}
+
 // get a message from the queue
 func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int64) ([]riak.RObject, error) {
 	// grab a riak client
@@ -333,17 +345,27 @@ func (queues *Queues) syncConfig(cfg *Config) {
 			queuesToKeep[queueName] = true
 		}
 
+
+
 		//iterate over the topics in topics.TopicMap and delete the ones no longer used
+		topics := cfg.Topics
 		for queue, _ := range queues.QueueMap {
 			var present bool
 			_, present = queuesToKeep[queue]
 			if present != true {
+				for topic, _ := range topics.TopicMap {
+					topicQueueList := topics.TopicMap[topic].ListQueues()
+					for _, topicQueue := range topicQueueList {
+						if topicQueue == string(queue) {
+							topics.TopicMap[topic].DeleteQueue(cfg, string(queue))
+						}
+					}
+				}
 				delete(queues.QueueMap, queue)
 			}
 		}
 
 		//sync all topics with riak
-
 		for _, queue := range queues.QueueMap {
 			queue.syncConfig(cfg)
 		}
