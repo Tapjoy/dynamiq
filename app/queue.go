@@ -181,6 +181,13 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
+		// Prepare the body and compress, if need be
+		var body = []byte(message)
+		var shouldCompress, _ = cfg.GetCompressedMessages(queue.Name)
+		if shouldCompress == true {
+			body, _ = cfg.Compressor.Compress(body)
+		}
+
 		//Retrieve a UUID
 		randy, _ := rand.Int(rand.Reader, &MAX_ID_SIZE)
 		uuid := randy.String()
@@ -189,7 +196,7 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 		messageObj.Indexes["id_int"] = []string{uuid}
 		// THIS NEEDS TO BE CONFIGURABLE
 		messageObj.ContentType = "application/json"
-		messageObj.Data = []byte(message)
+		messageObj.Data = body
 		messageObj.Store()
 
 		defer incrementMessageCount(cfg.Stats.Client, queue.Name, 1)
@@ -226,6 +233,8 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rKeys = make(chan string, len(ids))
 
 	start := time.Now()
+	// We might need to decompress the data
+	var decompressMessages, _ = cfg.GetCompressedMessages(queue.Name)
 	// foreach message id we have
 	for i := 0; i < len(ids); i++ {
 		// Kick off a go routine
@@ -243,6 +252,10 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 				// library works
 				logrus.Debug(err)
 				// If we didn't get an error, push the riak object into the objectarray channel
+			}
+			if decompressMessages == true {
+				var data, _ = cfg.Compressor.Decompress(rObject.Data)
+				rObject.Data = data
 			}
 			rObjectArrayChan <- *rObject
 		}()
