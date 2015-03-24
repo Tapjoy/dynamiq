@@ -72,7 +72,8 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
 	// also tieing topics this is next for refactor
-	topics := InitTopics(cfg, queues)
+	topics := InitTopics(cfg, queues)	
+	cfg.Topics = &topics
 	m := dynamiqMartini(cfg)
 	m.Use(render.Renderer())
 
@@ -98,6 +99,19 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				r.JSON(200, map[string]interface{}{"Deleted": deleted})
 			} else {
 				r.JSON(404, map[string]interface{}{"error": "Topic did not exist."})
+			}
+		})
+
+
+		m.Delete("/queues/:queue", func(r render.Render, params martini.Params) {
+			var present bool
+			_, present = queues.QueueMap[params["queue"]]			
+			if present == true {
+				queues.DeleteQueue(params["queue"], cfg)
+				deleted := true
+				r.JSON(200, map[string]interface{}{"Deleted": deleted})
+			} else {
+				r.JSON(404, map[string]interface{}{"error": "Queue did not exist."})
 			}
 		})
 

@@ -35,6 +35,7 @@ type Config struct {
 	Stats    Stats
 	Queues   *Queues
 	RiakPool *riak.Client
+	Topics   *Topics
 }
 
 type Core struct {
@@ -235,7 +236,7 @@ func (cfg *Config) GetMaxPartitionAge(queueName string) (float64, error) {
 func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, error) {
 	// Read from local cache
 	value := ""
-
+	var err error
 	// If cfg.Queues is nil, it means we're in the middle of booting, and we're trying to configure
 	// partition counts. If this is the case, skip to reading directly from Riak
 	// This means booting up will incur a number of extra reads to Riak
@@ -245,11 +246,15 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 	// While we wait, go and read from Riak directly
 	if cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
-			value = registerValueToString(cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName))
+			value, err = registerValueToString(cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName))
+			if err != nil {
+				// In the case where a register has been deleted, or for whatver reason gone, return an empty string, and
+				// an error stating that it is nil.
+				return value, err
+			}
 		}
 	}
-
-	var err error
+	
 	if value == "" {
 		// Read from riak
 		client := cfg.RiakConnection()
@@ -266,7 +271,7 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 
 		if val != nil {
 			// We had a register with this name, return the value
-			value = registerValueToString(val)
+			value, err = registerValueToString(val)
 		}
 	}
 	return value, err
@@ -291,8 +296,12 @@ func (cfg *Config) setQueueSetting(paramName string, queueName string, value str
 
 // HELPERS
 
-func registerValueToString(reg *riak.RDtRegister) string {
-	return string(reg.Value[:])
+func registerValueToString(reg *riak.RDtRegister) (string, error) {
+	// The register might have been deleted at this point, so handle nil case.
+	if reg == nil {
+		return "", errors.New("Register is nil.")
+	}
+	return string(reg.Value[:]), nil
 }
 
 func (cfg *Config) RiakConnection() *riak.Client {
