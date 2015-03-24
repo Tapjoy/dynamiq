@@ -297,6 +297,7 @@ func (cfg *Config) setQueueSetting(paramName string, queueName string, value str
 // HELPERS
 
 func registerValueToString(reg *riak.RDtRegister) (string, error) {
+	// The register might have been deleted at this point, so handle nil case.
 	if reg == nil {
 		return "", errors.New("Register is nil.")
 	}

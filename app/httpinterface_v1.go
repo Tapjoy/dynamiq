@@ -48,11 +48,14 @@ func logrusLogger() martini.Handler {
 	}
 }
 
-func dynamiqMartini() *martini.ClassicMartini {
+func dynamiqMartini(cfg *Config) *martini.ClassicMartini {
 	r := martini.NewRouter()
 	m := martini.New()
 
-	m.Map(logrus.New())
+	log := logrus.New()
+	log.Level = cfg.Core.LogLevel
+
+	m.Map(log)
 	m.Use(logrusLogger())
 	m.Use(martini.Recovery())
 	m.Use(martini.Static("public"))
@@ -69,10 +72,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
 	// also tieing topics this is next for refactor
-	topics := InitTopics(cfg, queues)
+	topics := InitTopics(cfg, queues)	
 	cfg.Topics = &topics
-
-	m := dynamiqMartini()
+	m := dynamiqMartini(cfg)
 	m.Use(render.Renderer())
 
 	// Group the routes underneath their version

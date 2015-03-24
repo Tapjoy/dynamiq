@@ -128,6 +128,9 @@ func (queues Queues) DeleteQueue(name string, cfg *Config) bool {
 	config.FetchSet("queues").Remove([]byte(name))
 	config.Store()
 
+	bucketConfig, _ := bucket.FetchMap(queueConfigRecordName(name))
+	bucketConfig.Destroy()
+
 	//return true if queue doesn't exist anymore
 	return !queues.Exists(cfg, name)
 }
@@ -344,8 +347,6 @@ func (queues *Queues) syncConfig(cfg *Config) {
 			}
 			queuesToKeep[queueName] = true
 		}
-
-
 
 		//iterate over the topics in topics.TopicMap and delete the ones no longer used
 		topics := cfg.Topics
