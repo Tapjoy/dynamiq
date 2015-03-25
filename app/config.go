@@ -245,10 +245,6 @@ func (cfg *Config) GetMaxPartitionAge(queueName string) (float64, error) {
 
 func (cfg *Config) GetCompressedMessages(queueName string) (bool, error) {
 	val, _ := cfg.getQueueSetting(COMPRESSED_MESSAGES, queueName)
-	if val == "" {
-		// If the queue pre-dated this setting, an empty value is equivalent to not compressing the data
-		return false, nil
-	}
 	return strconv.ParseBool(val)
 }
 
@@ -270,11 +266,14 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 	// While we wait, go and read from Riak directly
 	if cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
-			value, err = registerValueToString(cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName))
-			if err != nil {
-				// In the case where a register has been deleted, or for whatver reason gone, return an empty string, and
-				// an error stating that it is nil.
-				return value, err
+			regValue := cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName)
+			if regValue != nil {
+				value = registerValueToString(regValue)
+			} else {
+				// There is a chance the queue pre-dated the existence of the given parameter. If so, use the
+				// configured default value for now
+				// TODO - Need to backfill missing params when they're detected
+				value = DEFAULT_SETTINGS[paramName]
 			}
 		}
 	}
