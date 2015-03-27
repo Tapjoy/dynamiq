@@ -33,12 +33,16 @@ var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, 
 var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "5", MIN_PARTITIONS: "1", MAX_PARTITIONS: "10", MAX_PARTITION_AGE: "432000", COMPRESSED_MESSAGES: "false"}
 
 type Config struct {
+	Core     Core
+	Stats    Stats
+	Queues   *Queues
+	RiakPool *riak.Client
+	Topics   *Topics
 	Core       Core
 	Stats      Stats
 	Compressor compressor.Compressor
 	Queues     *Queues
 	RiakPool   *riak.Client
-	Topics     *Topics
 }
 
 type Core struct {
@@ -262,6 +266,13 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 	// While we wait, go and read from Riak directly
 	if cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
+<<<<<<< HEAD
+			value, err = registerValueToString(cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName))
+			if err != nil {
+				// In the case where a register has been deleted, or for whatver reason gone, return an empty string, and
+				// an error stating that it is nil.
+				return value, err
+=======
 			regValue := cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName)
 			if regValue != nil {
 				value = registerValueToString(regValue)
@@ -270,10 +281,11 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 				// configured default value for now
 				// TODO - Need to backfill missing params when they're detected
 				value = DEFAULT_SETTINGS[paramName]
+>>>>>>> Fixing bug with missing queue params when the queue pre-dated them
 			}
 		}
 	}
-
+	
 	if value == "" {
 		// Read from riak
 		client := cfg.RiakConnection()
