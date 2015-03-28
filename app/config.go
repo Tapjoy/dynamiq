@@ -264,7 +264,10 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
 			regValue := cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName)
 			if regValue != nil {
-				value = registerValueToString(regValue)
+				value, err = registerValueToString(regValue)
+				if err != nil {
+					return value, err
+				}
 			} else {
 				// There is a chance the queue pre-dated the existence of the given parameter. If so, use the
 				// configured default value for now
