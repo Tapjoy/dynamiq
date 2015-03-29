@@ -41,6 +41,7 @@ func InitPartitions(cfg *Config, queueName string) *Partitions {
 func (part *Partitions) PartitionCount() int {
 	return part.partitionCount
 }
+
 func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, *Partition, error) {
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
@@ -114,6 +115,7 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 	}
 	return myPartition, workingPartition, part.partitionCount, err
 }
+
 func (part *Partitions) PushPartition(cfg *Config, queueName string, partition *Partition, lock bool) {
 	if lock {
 		partition.LastUsed = time.Now()
