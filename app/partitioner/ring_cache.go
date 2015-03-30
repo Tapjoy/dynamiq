@@ -144,7 +144,7 @@ func (rc *TimedRingCache) ExpireRange(lowerBound int64, upperBound int64) {
 func (rc *TimedRingCache) beginExpiring() {
 	go func() {
 		for _ = range time.Tick(rc.gcInterval) {
-			logrus.Info("Checking expiration...", time.Now(), len(rc.ring))
+			//logrus.Info("Checking expiration...", time.Now(), len(rc.ring))
 			if len(rc.ring) > 0 && time.Since(rc.ring[0].timeStamp) >= rc.expirationDuration {
 				rc.Lock()
 				// This is effectively a pop off of the head, pos 0, of a slice

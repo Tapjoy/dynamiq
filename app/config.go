@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/Tapjoy/dynamiq/app/partitioner"
 	"github.com/Tapjoy/dynamiq/app/stats"
+	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
 	"math/rand"
 	"strconv"
@@ -36,6 +38,7 @@ type Config struct {
 	Queues   *Queues
 	RiakPool *riak.Client
 	Topics   *Topics
+	Nodes    *memberlist.Memberlist
 }
 
 type Core struct {
@@ -75,6 +78,8 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 		logrus.Fatal(err)
 	}
 
+	cfg.Nodes = InitMember(&cfg)
+	logrus.Info("Nodes ?", cfg.Nodes)
 	cfg.RiakPool = initRiakPool(&cfg)
 	cfg.Queues = loadQueuesConfig(&cfg)
 	switch cfg.Stats.Type {
@@ -120,11 +125,15 @@ func loadQueuesConfig(cfg *Config) *Queues {
 		name := string(elem[:])
 		// Get the Riak RdtMap of settings for this queue
 		configMap, _ := configBucket.FetchMap(queueConfigRecordName(name))
+		visTimeout, _ := cfg.GetVisibilityTimeout(name)
+		ringCache := partitioner.NewTimedRingCache(time.Second*time.Duration(visTimeout), time.Second*1)
+
 		// Pre-warm the settings object
 		queue := &Queue{
-			Name:   name,
-			Config: configMap,
-			Parts:  InitPartitions(cfg, name),
+			Name:        name,
+			Config:      configMap,
+			Partitioner: partitioner.NewRangePartitioner(cfg.Nodes, ringCache),
+			Parts:       InitPartitions(cfg, name),
 		}
 		// TODO: We should be handling errors here
 		// Set the queue in the queue map
@@ -143,11 +152,15 @@ func (cfg *Config) InitializeQueue(queueName string) error {
 	}
 	// Add to the known set of queues
 	err = cfg.addToKnownQueues(queueName)
+	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
+	ringCache := partitioner.NewTimedRingCache(time.Second*time.Duration(visTimeout), time.Second*1)
+
 	// Now, add the queue into our memory-cache of data
 	cfg.Queues.QueueMap[queueName] = &Queue{
-		Name:   queueName,
-		Parts:  InitPartitions(cfg, queueName),
-		Config: configMap,
+		Name:        queueName,
+		Parts:       InitPartitions(cfg, queueName),
+		Partitioner: partitioner.NewRangePartitioner(cfg.Nodes, ringCache),
+		Config:      configMap,
 	}
 	return err
 }
@@ -254,7 +267,7 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 			}
 		}
 	}
-	
+
 	if value == "" {
 		// Read from riak
 		client := cfg.RiakConnection()
