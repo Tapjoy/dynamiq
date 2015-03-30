@@ -71,9 +71,8 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
-	// also tieing topics this is next for refactor
-	topics := InitTopics(cfg, queues)	
-	cfg.Topics = &topics
+	topics := cfg.Topics
+
 	m := dynamiqMartini(cfg)
 	m.Use(render.Renderer())
 
