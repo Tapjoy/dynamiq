@@ -18,9 +18,31 @@ func main() {
 	}
 	logrus.SetLevel(cfg.Core.LogLevel)
 
-	list := app.InitMember(cfg)
-
 	http_api := app.HTTP_API_V1{}
 
-	http_api.InitWebserver(list, cfg)
+	//go func() {
+	//	for i := 0; i < 35; i++ {
+	//		x, y := timedRingCache.ReserveRange(1, 200, 7)
+	//		logrus.Info("AAAAAAAAA Range is ", x, y)
+	//		time.Sleep(time.Millisecond * 100)
+	//	}
+	//}()
+	//
+	//go func() {
+	//	for i := 0; i < 35; i++ {
+	//		x, y := timedRingCache.ReserveRange(1, 200, 7)
+	//		logrus.Info("BBBBBBBBBB Range is ", x, y)
+	//		time.Sleep(time.Millisecond * 100)
+	//	}
+	//}()
+	//
+	//go func() {
+	//	for i := 0; i < 35; i++ {
+	//		x, y := timedRingCache.ReserveRange(1, 200, 7)
+	//		logrus.Info("CCCCCCCCCCCC Range is ", x, y)
+	//		time.Sleep(time.Millisecond * 100)
+	//	}
+	//}()
+
+	http_api.InitWebserver(cfg)
 }

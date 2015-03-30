@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/go-martini/martini"
-	"github.com/hashicorp/memberlist"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"net/http"
@@ -67,12 +66,12 @@ func dynamiqMartini(cfg *Config) *martini.ClassicMartini {
 type HTTP_API_V1 struct {
 }
 
-func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
+func (h HTTP_API_V1) InitWebserver(cfg *Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
 	// also tieing topics this is next for refactor
-	topics := InitTopics(cfg, queues)	
+	topics := InitTopics(cfg, queues)
 	cfg.Topics = &topics
 	m := dynamiqMartini(cfg)
 	m.Use(render.Renderer())
@@ -82,7 +81,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		// STATUS / STATISTICS API BLOCK
 		m.Get("/status/servers", func() string {
 			return_string := ""
-			for _, member := range list.Members() {
+			for _, member := range cfg.Nodes.Members() {
 				return_string += fmt.Sprintf("Member: %s %s\n", member.Name, member.Addr)
 			}
 			return return_string
@@ -102,10 +101,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 		})
 
-
 		m.Delete("/queues/:queue", func(r render.Render, params martini.Params) {
 			var present bool
-			_, present = queues.QueueMap[params["queue"]]			
+			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
 				queues.DeleteQueue(params["queue"], cfg)
 				deleted := true
@@ -290,7 +288,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				if batchSize <= 0 {
 					r.JSON(422, fmt.Sprint("Batchsizes must be non-negative integers greater than 0"))
 				}
-				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
+				messages, err := queues.QueueMap[params["queue"]].Get(cfg, cfg.Nodes, batchSize)
 
 				if err != nil && err.Error() != NOPARTITIONS {
 					// We're choosing to ignore nopartitions issues for now and treat them as normal 200s

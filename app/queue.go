@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/Tapjoy/dynamiq/app/partitioner"
 	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
@@ -39,7 +40,8 @@ type Queue struct {
 	// name of the queue
 	Name string
 	// the partitions of the queue
-	Parts *Partitions
+	Parts       *Partitions
+	Partitioner *partitioner.RangePartitioner
 	// Individual settings for the queue
 	Config *riak.RDtMap
 	// Mutex for protecting rw access to the Config object
@@ -148,13 +150,13 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int6
 	}
 
 	// get the top and bottom partitions
-	partBottom, partTop, partition, err := queue.Parts.GetPartition(cfg, queue.Name, list)
-
+	//partBottom, partTop, partition, err := queue.Parts.GetPartition(cfg, queue.Name, list)
+	partBottom, partTop, partition, err := queue.Partitioner.GetRange(5000000)
 	if err != nil {
 		return nil, err
 	}
 	//get a list of batchsize message ids
-	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.Itoa(partBottom), strconv.Itoa(partTop), uint32(batchsize), "")
+	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.FormatInt(partBottom, 10), strconv.FormatInt(partTop, 10), uint32(batchsize), "")
 	defer queue.setQueueDepthApr(cfg.Stats.Client, list, queue.Name, messageIds)
 
 	if err != nil {
@@ -165,9 +167,10 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int6
 
 	// return the partition to the parts heap, but only lock it when we have messages
 	if messageCount > 0 {
-		defer queue.Parts.PushPartition(cfg, queue.Name, partition, true)
+		//defer queue.Parts.PushPartition(cfg, queue.Name, partition, true)
 	} else {
-		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
+		//defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
+		defer queue.Partitioner.ExpireRange(partBottom, partTop, partition)
 	}
 	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, messageCount)
 	defer recordFillRatio(cfg.Stats.Client, queue.Name, batchsize, messageCount)
@@ -380,11 +383,14 @@ func initQueueFromRiak(cfg *Config, queueName string) {
 
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	config, _ := bucket.FetchMap(queueConfigRecordName(queueName))
-
+	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
+	ringCache := partitioner.NewTimedRingCache(time.Second*time.Duration(visTimeout), time.Second*1)
+	logrus.Info("Nodes??", cfg.Nodes)
 	queue := Queue{
-		Name:   queueName,
-		Parts:  InitPartitions(cfg, queueName),
-		Config: config,
+		Name:        queueName,
+		Parts:       InitPartitions(cfg, queueName),
+		Partitioner: partitioner.NewRangePartitioner(cfg.Nodes, ringCache),
+		Config:      config,
 	}
 
 	// This is adding a new member to the collection, it shouldn't need a lock?
