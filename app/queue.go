@@ -185,7 +185,14 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 		var body = []byte(message)
 		var shouldCompress, _ = cfg.GetCompressedMessages(queue.Name)
 		if shouldCompress == true {
-			body, _ = cfg.Compressor.Compress(body)
+			var compressedBody []byte
+			compressedBody, err = cfg.Compressor.Compress(body)
+			if err != nil {
+				logrus.Error("Error compressing message body")
+				logrus.Error(err)
+			} else {
+				body = compressedBody
+			}
 		}
 
 		//Retrieve a UUID

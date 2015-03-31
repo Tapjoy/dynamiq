@@ -25,9 +25,9 @@ type ZlibCompressor struct {
 func (z ZlibCompressor) Compress(value []byte) ([]byte, error) {
 	var b bytes.Buffer
 	w := zlib.NewWriter(&b)
-	w.Write(value)
+	_, err := w.Write(value)
 	w.Close()
-	return b.Bytes(), nil
+	return b.Bytes(), err
 }
 
 func (z ZlibCompressor) Decompress(value []byte) ([]byte, error) {
