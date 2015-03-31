@@ -18,10 +18,11 @@ import (
 // omitempty tells it to ignore anything where the name was provided, but an empty value
 // inside of a request body.
 type ConfigRequest struct {
-	VisibilityTimeout *float64 `json:"visibility_timeout,omitempty"`
-	MinPartitions     *int     `json:"min_partitions,omitempty"`
-	MaxPartitions     *int     `json:"max_partitions,omitempty"`
-	MaxPartitionAge   *float64 `json:"max_partition_age,omitempty"`
+	VisibilityTimeout  *float64 `json:"visibility_timeout,omitempty"`
+	MinPartitions      *int     `json:"min_partitions,omitempty"`
+	MaxPartitions      *int     `json:"max_partitions,omitempty"`
+	MaxPartitionAge    *float64 `json:"max_partition_age,omitempty"`
+	CompressedMessages *bool    `json:"compressed_messages,omitempty"`
 }
 
 // TODO make message definitions more explicit
@@ -213,6 +214,15 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				}
 			}
 
+			if configRequest.CompressedMessages != nil {
+				err = cfg.SetCompressedMessages(params["queue"], *configRequest.CompressedMessages)
+				if err != nil {
+					logrus.Println(err)
+					r.JSON(500, map[string]interface{}{"error": err.Error()})
+					return
+				}
+			}
+
 			r.JSON(200, "ok")
 		})
 
@@ -269,6 +279,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				queueReturn["min_partitions"], _ = cfg.GetMinPartitions(params["queue"])
 				queueReturn["max_partitions"], _ = cfg.GetMaxPartitions(params["queue"])
 				queueReturn["max_partition_age"], _ = cfg.GetMaxPartitionAge(params["queue"])
+				queueReturn["compressed_messages"], _ = cfg.GetCompressedMessages(params["queue"])
 				queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 				r.JSON(200, queueReturn)
 			} else {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Sirupsen/logrus"
+	"github.com/Tapjoy/dynamiq/app/compressor"
 	"github.com/Tapjoy/dynamiq/app/stats"
 	"github.com/tpjg/goriakpbc"
 	"math/rand"
@@ -25,17 +26,19 @@ const PARTITION_COUNT = "partition_count"
 const MIN_PARTITIONS = "min_partitions"
 const MAX_PARTITIONS = "max_partitions"
 const MAX_PARTITION_AGE = "max_partition_age"
+const COMPRESSED_MESSAGES = "compressed_messages"
 
 // Arrays and maps cannot be made immutable in golang
-var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, MAX_PARTITIONS, MAX_PARTITION_AGE}
-var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "50", MIN_PARTITIONS: "10", MAX_PARTITIONS: "100", MAX_PARTITION_AGE: "300"}
+var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, MAX_PARTITIONS, MAX_PARTITION_AGE, COMPRESSED_MESSAGES}
+var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "5", MIN_PARTITIONS: "1", MAX_PARTITIONS: "10", MAX_PARTITION_AGE: "432000", COMPRESSED_MESSAGES: "false"}
 
 type Config struct {
-	Core     Core
-	Stats    Stats
-	Queues   *Queues
-	RiakPool *riak.Client
-	Topics   *Topics
+	Core       Core
+	Stats      Stats
+	Compressor compressor.Compressor
+	Queues     *Queues
+	RiakPool   *riak.Client
+	Topics     *Topics
 }
 
 type Core struct {
@@ -83,6 +86,10 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 	default:
 		cfg.Stats.Client = stats.NewNOOPClient()
 	}
+
+	// Currently we only support zlib, but we may support others
+	// Here is where we'd detect and inject
+	cfg.Compressor = compressor.NewZlibCompressor()
 
 	cfg.Core.LogLevel, err = logrus.ParseLevel(cfg.Core.LogLevelString)
 	if err != nil {
@@ -232,6 +239,15 @@ func (cfg *Config) GetMaxPartitionAge(queueName string) (float64, error) {
 	return strconv.ParseFloat(val, 32)
 }
 
+func (cfg *Config) GetCompressedMessages(queueName string) (bool, error) {
+	val, _ := cfg.getQueueSetting(COMPRESSED_MESSAGES, queueName)
+	return strconv.ParseBool(val)
+}
+
+func (cfg *Config) SetCompressedMessages(queueName string, compressedMessages bool) error {
+	return cfg.setQueueSetting(COMPRESSED_MESSAGES, queueName, strconv.FormatBool(compressedMessages))
+}
+
 // TODO Find a proper way to scope this to a queue VS a topic
 func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, error) {
 	// Read from local cache
@@ -246,15 +262,21 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 	// While we wait, go and read from Riak directly
 	if cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
-			value, err = registerValueToString(cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName))
-			if err != nil {
-				// In the case where a register has been deleted, or for whatver reason gone, return an empty string, and
-				// an error stating that it is nil.
-				return value, err
+			regValue := cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName)
+			if regValue != nil {
+				value, err = registerValueToString(regValue)
+				if err != nil {
+					return value, err
+				}
+			} else {
+				// There is a chance the queue pre-dated the existence of the given parameter. If so, use the
+				// configured default value for now
+				// TODO - Need to backfill missing params when they're detected
+				value = DEFAULT_SETTINGS[paramName]
 			}
 		}
 	}
-	
+
 	if value == "" {
 		// Read from riak
 		client := cfg.RiakConnection()
