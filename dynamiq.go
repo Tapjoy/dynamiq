@@ -13,6 +13,10 @@ func main() {
 
 	//setup the config file
 	cfg, err := app.GetCoreConfig(config_file)
+
+	topics := app.InitTopics(cfg, cfg.Queues)
+	cfg.Topics = &topics
+
 	if err != nil {
 		logrus.Fatal(err)
 	}
