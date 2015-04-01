@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"strings"
 )
 
 // TODO Should this live in the config package?
@@ -283,6 +284,20 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				r.JSON(200, queueReturn)
 			} else {
 				r.JSON(404, fmt.Sprintf("There is no queue named %s", params["queue"]))
+			}
+		})
+
+		m.Get("/queues/:queue/message/:messageId", func(r render.Render, params martini.Params) {
+			queue := queues.QueueMap[params["queue"]]
+			if queue != nil {
+				messages := queue.RetrieveMessages(strings.Fields(params["messageId"]), cfg)
+				if (len(messages)) > 0 {
+					r.JSON(200, map[string]interface{}{"messages": messages})
+				} else {
+					r.JSON(404, map[string]interface{}{"error": fmt.Sprintf("Messages with id: %s not found.", params["message"])})
+				}
+			} else {
+				r.JSON(404, map[string]interface{}{"error": fmt.Sprintf("There is no queue named %s", params["queue"])})
 			}
 		})
 
