@@ -45,6 +45,7 @@ func prioritizeSeedServers(name string, seedServers []string) []string {
 		}
 	}
 
+	// Sort them, so we have a consistent ordering
 	sort.Strings(seedServers)
 
 	myPos := 0
@@ -56,8 +57,13 @@ func prioritizeSeedServers(name string, seedServers []string) []string {
 		}
 	}
 
+	// Split the array on our position to get a pre- and post- set of slices
 	preSlice := seedServers[0:myPos]
 	postSlice := seedServers[myPos+1 : len(seedServers)]
 
+	// Return the post slice (after our pos) followed by the pre slice (prior to our pos)
+	// This removes us from the array, and puts the elements immediately following us ahead of the ones
+	// that used to be infront of us. This way, each node always tries to hit the next node
+	// instead of all of them trying the same node, or a random shuffle which could be the same node
 	return append(postSlice, preSlice...)
 }
