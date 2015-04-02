@@ -22,8 +22,7 @@ func main() {
 	}
 	logrus.SetLevel(cfg.Core.LogLevel)
 
-	list := app.InitMember(cfg)
-
+	list, _, err := app.InitMemberList(cfg.Core.Name, cfg.Core.Port, cfg.Core.SeedServers, cfg.Core.SeedPort)
 	http_api := app.HTTP_API_V1{}
 
 	http_api.InitWebserver(list, cfg)
