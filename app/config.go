@@ -10,6 +10,7 @@ import (
 	"github.com/tpjg/goriakpbc"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -46,6 +47,7 @@ type Core struct {
 	Port                  int
 	SeedServer            string
 	SeedPort              int
+	SeedServers           []string
 	HttpPort              int
 	RiakNodes             string
 	BackendConnectionPool int
@@ -76,6 +78,15 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 	err := gcfg.ReadFileInto(&cfg, *config_file)
 	if err != nil {
 		logrus.Fatal(err)
+	}
+
+	if len(cfg.Core.SeedServer) == 0 {
+		logrus.Fatal("The list of seedservers was empty")
+	}
+
+	cfg.Core.SeedServers = strings.Split(cfg.Core.SeedServer, ",")
+	for i, x := range cfg.Core.SeedServers {
+		cfg.Core.SeedServers[i] = x + ":" + strconv.Itoa(cfg.Core.SeedPort)
 	}
 
 	cfg.RiakPool = initRiakPool(&cfg)

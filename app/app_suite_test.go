@@ -35,6 +35,7 @@ var _ = BeforeSuite(func() {
 		Name:                  "john",
 		Port:                  8000,
 		SeedServer:            "steve",
+		SeedServers:           []string{"steve"},
 		SeedPort:              8001,
 		HttpPort:              8003,
 		RiakNodes:             "127.0.0.1",
@@ -67,7 +68,7 @@ var _ = BeforeSuite(func() {
 	cfg.Queues = queues
 
 	// Create a memberlist, aka the list of possible RiaQ processes to communicate with
-	memberList = app.InitMember(cfg)
+	memberList, _, _ = app.InitMemberList(core.Name, core.Port, core.SeedServers, core.SeedPort)
 
 	// Disable log output during tests
 	logrus.SetOutput(ioutil.Discard)
