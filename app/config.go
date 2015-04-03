@@ -80,6 +80,10 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 		logrus.Fatal(err)
 	}
 
+	if len(cfg.Core.SeedServer) == 0 {
+		logrus.Fatal("The list of seedservers was empty")
+	}
+
 	cfg.Core.SeedServers = strings.Split(cfg.Core.SeedServer, ",")
 	for i, x := range cfg.Core.SeedServers {
 		cfg.Core.SeedServers[i] = x + ":" + strconv.Itoa(cfg.Core.SeedPort)
