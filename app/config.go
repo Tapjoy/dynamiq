@@ -57,12 +57,11 @@ type Core struct {
 }
 
 type Stats struct {
-	Type                 string
-	FlushInterval        int
-	Address              string
-	Prefix               string
-	Client               stats.StatsClient
-	InternalStatsdServer bool
+	Type          string
+	FlushInterval int
+	Address       string
+	Prefix        string
+	Client        stats.StatsClient
 }
 
 func initRiakPool(cfg *Config) *riak.Client {
