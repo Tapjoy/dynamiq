@@ -11,6 +11,11 @@ func main() {
 	config_file := flag.String("c", "./lib/config.gcfg", "location of config file")
 	flag.Parse()
 
+	if *config_file == "" {
+		logrus.Warn("Empty value provided for config file location from flag -c : Falling back to default location './lib/config.gcfg'")
+		*config_file = "./lib/config.gcfg"
+	}
+
 	//setup the config file
 	cfg, err := app.GetCoreConfig(config_file)
 
