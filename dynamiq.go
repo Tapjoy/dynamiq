@@ -19,7 +19,7 @@ func main() {
 	//setup the config file
 	cfg, err := app.GetCoreConfig(config_file)
 
-	topics := app.InitTopics(cfg, cfg.Queues)
+	topics := app.InitTopics()
 	cfg.Topics = &topics
 
 	if err != nil {
@@ -27,8 +27,7 @@ func main() {
 	}
 	logrus.SetLevel(cfg.Core.LogLevel)
 
-	list, _, err := app.InitMemberList(cfg.Core.Name, cfg.Core.Port, cfg.Core.SeedServers, cfg.Core.SeedPort)
 	http_api := app.HTTP_API_V1{}
 
-	http_api.InitWebserver(list, cfg)
+	http_api.InitWebserver()
 }

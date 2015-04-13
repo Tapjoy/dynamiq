@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/go-martini/martini"
-	"github.com/hashicorp/memberlist"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"net/http"
 	"strconv"
-	"time"
 	"strings"
+	"time"
 )
 
 // TODO Should this live in the config package?
@@ -50,12 +49,12 @@ func logrusLogger() martini.Handler {
 	}
 }
 
-func dynamiqMartini(cfg *Config) *martini.ClassicMartini {
+func dynamiqMartini() *martini.ClassicMartini {
 	r := martini.NewRouter()
 	m := martini.New()
 
 	log := logrus.New()
-	log.Level = cfg.Core.LogLevel
+	log.Level = GetConfig().Core.LogLevel
 
 	m.Map(log)
 	m.Use(logrusLogger())
@@ -69,13 +68,13 @@ func dynamiqMartini(cfg *Config) *martini.ClassicMartini {
 type HTTP_API_V1 struct {
 }
 
-func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
+func (h HTTP_API_V1) InitWebserver() {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	// Queues.Queues is dumb. Need a better name-chain
-	queues := cfg.Queues
-	topics := cfg.Topics
+	queues := GetConfig().Queues
+	topics := GetConfig().Topics
 
-	m := dynamiqMartini(cfg)
+	m := dynamiqMartini()
 	m.Use(render.Renderer())
 
 	// Group the routes underneath their version
@@ -83,7 +82,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		// STATUS / STATISTICS API BLOCK
 		m.Get("/status/servers", func() string {
 			return_string := ""
-			for _, member := range list.Members() {
+			for _, member := range GetConfig().MemberNodes.Members() {
 				return_string += fmt.Sprintf("Member: %s %s\n", member.Name, member.Addr)
 			}
 			return return_string
@@ -103,12 +102,11 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 		})
 
-
 		m.Delete("/queues/:queue", func(r render.Render, params martini.Params) {
 			var present bool
-			_, present = queues.QueueMap[params["queue"]]			
+			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
-				queues.DeleteQueue(params["queue"], cfg)
+				queues.DeleteQueue(params["queue"])
 				deleted := true
 				r.JSON(200, map[string]interface{}{"Deleted": deleted})
 			} else {
@@ -120,7 +118,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			var present bool
 			_, present = queues.QueueMap[params["queue"]]
 			if present != true {
-				cfg.InitializeQueue(params["queue"])
+				GetConfig().InitializeQueue(params["queue"])
 				r.JSON(201, "created")
 			} else {
 				r.JSON(422, map[string]interface{}{"error": "Queue already exists."})
@@ -148,7 +146,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				if present != true {
 					r.JSON(422, map[string]interface{}{"error": "Queue does not exist. Please create it first"})
 				} else {
-					topics.TopicMap[params["topic"]].AddQueue(cfg, params["queue"])
+					topics.TopicMap[params["topic"]].AddQueue(params["queue"])
 					r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 				}
 			}
@@ -161,7 +159,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			if present != true {
 				topics.InitTopic(params["topic"])
 			}
-			topics.TopicMap[params["topic"]].DeleteQueue(cfg, params["queue"])
+			topics.TopicMap[params["topic"]].DeleteQueue(params["queue"])
 			r.JSON(200, map[string]interface{}{"Queues": topics.TopicMap[params["topic"]].ListQueues()})
 		})
 
@@ -178,7 +176,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			// returns the first error it runs across. Would simplify the code here greatly.
 			var err error
 			if configRequest.VisibilityTimeout != nil {
-				err = cfg.SetVisibilityTimeout(params["queue"], *configRequest.VisibilityTimeout)
+				err = GetConfig().SetVisibilityTimeout(params["queue"], *configRequest.VisibilityTimeout)
 				// We really need a proper way to generalize error handling
 				// Writing this out every time is going to be silly
 				if err != nil {
@@ -189,7 +187,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 
 			if configRequest.MinPartitions != nil {
-				err = cfg.SetMinPartitions(params["queue"], *configRequest.MinPartitions)
+				err = GetConfig().SetMinPartitions(params["queue"], *configRequest.MinPartitions)
 				if err != nil {
 					logrus.Println(err)
 					r.JSON(500, map[string]interface{}{"error": err.Error()})
@@ -198,7 +196,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 
 			if configRequest.MaxPartitions != nil {
-				err = cfg.SetMaxPartitions(params["queue"], *configRequest.MaxPartitions)
+				err = GetConfig().SetMaxPartitions(params["queue"], *configRequest.MaxPartitions)
 				if err != nil {
 					logrus.Println(err)
 					r.JSON(500, map[string]interface{}{"error": err.Error()})
@@ -206,7 +204,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				}
 			}
 			if configRequest.MaxPartitionAge != nil {
-				err = cfg.SetMaxPartitionAge(params["queue"], *configRequest.MaxPartitionAge)
+				err = GetConfig().SetMaxPartitionAge(params["queue"], *configRequest.MaxPartitionAge)
 				if err != nil {
 					logrus.Println(err)
 					r.JSON(500, map[string]interface{}{"error": err.Error()})
@@ -215,7 +213,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 
 			if configRequest.CompressedMessages != nil {
-				err = cfg.SetCompressedMessages(params["queue"], *configRequest.CompressedMessages)
+				err = GetConfig().SetCompressedMessages(params["queue"], *configRequest.CompressedMessages)
 				if err != nil {
 					logrus.Println(err)
 					r.JSON(500, map[string]interface{}{"error": err.Error()})
@@ -257,7 +255,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			var buf bytes.Buffer
 			buf.ReadFrom(req.Body)
 
-			response := topics.TopicMap[params["topic"]].Broadcast(cfg, buf.String())
+			response := topics.TopicMap[params["topic"]].Broadcast(buf.String())
 			r.JSON(200, response)
 		})
 
@@ -275,11 +273,11 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
 				queueReturn := make(map[string]interface{})
-				queueReturn["visibility_timeout"], _ = cfg.GetVisibilityTimeout(params["queue"])
-				queueReturn["min_partitions"], _ = cfg.GetMinPartitions(params["queue"])
-				queueReturn["max_partitions"], _ = cfg.GetMaxPartitions(params["queue"])
-				queueReturn["max_partition_age"], _ = cfg.GetMaxPartitionAge(params["queue"])
-				queueReturn["compressed_messages"], _ = cfg.GetCompressedMessages(params["queue"])
+				queueReturn["visibility_timeout"], _ = GetConfig().GetVisibilityTimeout(params["queue"])
+				queueReturn["min_partitions"], _ = GetConfig().GetMinPartitions(params["queue"])
+				queueReturn["max_partitions"], _ = GetConfig().GetMaxPartitions(params["queue"])
+				queueReturn["max_partition_age"], _ = GetConfig().GetMaxPartitionAge(params["queue"])
+				queueReturn["compressed_messages"], _ = GetConfig().GetCompressedMessages(params["queue"])
 				queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 				r.JSON(200, queueReturn)
 			} else {
@@ -290,7 +288,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		m.Get("/queues/:queue/message/:messageId", func(r render.Render, params martini.Params) {
 			queue := queues.QueueMap[params["queue"]]
 			if queue != nil {
-				messages := queue.RetrieveMessages(strings.Fields(params["messageId"]), cfg)
+				messages := queue.RetrieveMessages(strings.Fields(params["messageId"]))
 				if (len(messages)) > 0 {
 					r.JSON(200, map[string]interface{}{"messages": messages})
 				} else {
@@ -315,7 +313,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				if batchSize <= 0 {
 					r.JSON(422, fmt.Sprint("Batchsizes must be non-negative integers greater than 0"))
 				}
-				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
+				messages, err := queues.QueueMap[params["queue"]].Get(batchSize)
 
 				if err != nil && err.Error() != NOPARTITIONS {
 					// We're choosing to ignore nopartitions issues for now and treat them as normal 200s
@@ -352,7 +350,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				// TODO clean this up, full json api?
 				var buf bytes.Buffer
 				buf.ReadFrom(req.Body)
-				uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String())
+				uuid := queues.QueueMap[params["queue"]].Put(buf.String())
 
 				return uuid
 			} else {
@@ -365,12 +363,12 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			var present bool
 			_, present = queues.QueueMap[params["queue"]]
 			if present != true {
-				cfg.InitializeQueue(params["queue"])
+				GetConfig().InitializeQueue(params["queue"])
 			}
 
-			r.JSON(200, queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"]))
+			r.JSON(200, queues.QueueMap[params["queue"]].Delete(params["messageId"]))
 		})
 		// DATA INTERACTION API BLOCK
 	})
-	logrus.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
+	logrus.Fatal(http.ListenAndServe(":"+strconv.Itoa(GetConfig().Core.HttpPort), m))
 }
