@@ -119,9 +119,17 @@ func loadQueuesConfig(cfg *Config) *Queues {
 	client := cfg.RiakConnection()
 	// TODO: We should be handling errors here
 	// Get the bucket holding the map of config data
-	configBucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	configBucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	if err != nil {
+		// most commonly, the error here relates to a fundamental issue talking to riak
+		// likely, the connection pool is larger than the allowable number of file handles
+		logrus.Errorf("Error trying to get maps bucket type: %s", err)
+	}
 	// Fetch the object for holding the set of queues
-	config, _ := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	config, err := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	if err != nil {
+		logrus.Errorf("Error trying to get queue config bucket: %s", err)
+	}
 	queuesConfig.Config = config
 
 	// AddSet implicitly calls fetch set if the set already exists
