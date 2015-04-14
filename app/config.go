@@ -71,12 +71,13 @@ type Stats struct {
 	Client        stats.StatsClient
 }
 
-func initRiakPool(cfg *Config) *riak.Client {
+func initRiakPool() {
 	rand.Seed(time.Now().UnixNano())
 	// TODO this should just be 1 HAProxy
-	hosts := []string{cfg.Core.RiakNodes}
+	hosts := []string{config.Core.RiakNodes}
 	host := hosts[rand.Intn(len(hosts))]
-	return riak.NewClientPool(host, cfg.Core.BackendConnectionPool)
+	config.RiakPool = riak.NewClientPool(host, config.Core.BackendConnectionPool)
+	return
 }
 
 func GetCoreConfig(config_file *string) (*Config, error) {
@@ -100,8 +101,12 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 		logrus.Error(err)
 	}
 
-	config.RiakPool = initRiakPool(config)
-	config.Queues = loadQueuesConfig(config)
+	// This will place a fully prepared riak connection pool onto the config object
+	initRiakPool()
+
+	// This will load all the queue config from Riak and place it onto the config object
+	loadQueuesConfig()
+
 	switch config.Stats.Type {
 	case "statsd":
 		config.Stats.Client = stats.NewStatsdClient(config.Stats.Address, config.Stats.Prefix, time.Second*time.Duration(config.Stats.FlushInterval))
@@ -122,13 +127,13 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 	return config, err
 }
 
-func loadQueuesConfig(cfg *Config) *Queues {
+func loadQueuesConfig() {
 	// Create the Queues Config struct
 	queuesConfig := Queues{
 		QueueMap: make(map[string]*Queue),
 	}
 	// Get the queues
-	client := cfg.RiakConnection()
+	client := config.RiakConnection()
 	// TODO: We should be handling errors here
 	// Get the bucket holding the map of config data
 	configBucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -138,18 +143,18 @@ func loadQueuesConfig(cfg *Config) *Queues {
 		logrus.Errorf("Error trying to get maps bucket type: %s", err)
 	}
 	// Fetch the object for holding the set of queues
-	config, err := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	qconfigObj, err := configBucket.FetchMap(QUEUE_CONFIG_NAME)
 	if err != nil {
 		logrus.Errorf("Error trying to get queue config bucket: %s", err)
 	}
-	queuesConfig.Config = config
+	queuesConfig.Config = qconfigObj
 
 	// AddSet implicitly calls fetch set if the set already exists
-	queueSet := config.AddSet(QUEUE_SET_NAME)
+	queueSet := qconfigObj.AddSet(QUEUE_SET_NAME)
 	if queueSet == nil {
 		queueSet.Add([]byte("default_queue"))
-		config.Store()
-		config, _ = configBucket.FetchMap(QUEUE_CONFIG_NAME)
+		qconfigObj.Store()
+		qconfigObj, _ = configBucket.FetchMap(QUEUE_CONFIG_NAME)
 	}
 	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
@@ -167,8 +172,8 @@ func loadQueuesConfig(cfg *Config) *Queues {
 		// Set the queue in the queue map
 		queuesConfig.QueueMap[name] = queue
 	}
-	// Return the completed Queue cache of settings
-	return &queuesConfig
+	// Set the completed Queue cache of settings
+	config.Queues = &queuesConfig
 }
 
 func (cfg *Config) InitializeQueue(queueName string) error {
