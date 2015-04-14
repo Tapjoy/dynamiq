@@ -234,6 +234,28 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 	return false
 }
 
+func (queue *Queue) BatchDelete(cfg *Config, ids []string) (int, error) {
+	client := cfg.RiakConnection()
+	bucket, err := client.NewBucketType("messages", queue.Name)
+	errors := 0
+	if err == nil {
+		for _, id := range ids {
+			err = bucket.Delete(id)
+			if err != nil {
+				logrus.Error(err)
+				errors += 1
+			}
+		}
+		// Don't count deletes that failed
+		defer decrementMessageCount(cfg.Stats.Client, queue.Name, int64(len(ids)-errors))
+	} else {
+		// if we got here we're borked
+		// TODO stats cleanup? Possibility that this gets us out of sync
+		logrus.Error(err)
+	}
+	return errors, err
+}
+
 // helpers
 func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rObjectArrayChan = make(chan riak.RObject, len(ids))
