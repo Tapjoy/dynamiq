@@ -102,10 +102,10 @@ func (queue *Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Membe
 	}
 }
 
-func (queues *Queues) Exists(cfg *Config, queueName string) bool {
+func (queues *Queues) Exists(queueName string) bool {
 	// For now, lets go right to Riak for this
 	// Because of the config delay, we don't wanna check the memory values
-	client := cfg.RiakConnection()
+	client := GetConfig().RiakConnection()
 
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	m, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
@@ -120,8 +120,8 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	return false
 }
 
-func (queues Queues) DeleteQueue(name string, cfg *Config) bool {
-	client := cfg.RiakConnection()
+func (queues Queues) DeleteQueue(name string) bool {
+	client := GetConfig().RiakConnection()
 
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	config, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
@@ -132,13 +132,13 @@ func (queues Queues) DeleteQueue(name string, cfg *Config) bool {
 	bucketConfig.Destroy()
 
 	//return true if queue doesn't exist anymore
-	return !queues.Exists(cfg, name)
+	return !queues.Exists(name)
 }
 
 // get a message from the queue
-func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int64) ([]riak.RObject, error) {
+func (queue *Queue) Get(batchsize int64) ([]riak.RObject, error) {
 	// grab a riak client
-	client := cfg.RiakConnection()
+	client := GetConfig().RiakConnection()
 
 	//set the bucket
 	bucket, err := client.NewBucketType("messages", queue.Name)
@@ -148,14 +148,14 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int6
 	}
 
 	// get the top and bottom partitions
-	partBottom, partTop, partition, err := queue.Parts.GetPartition(cfg, queue.Name, list)
+	partBottom, partTop, partition, err := queue.Parts.GetPartition(queue.Name)
 
 	if err != nil {
 		return nil, err
 	}
 	//get a list of batchsize message ids
 	messageIds, _, err := bucket.IndexQueryRangePage("id_int", strconv.Itoa(partBottom), strconv.Itoa(partTop), uint32(batchsize), "")
-	defer queue.setQueueDepthApr(cfg.Stats.Client, list, queue.Name, messageIds)
+	defer queue.setQueueDepthApr(GetConfig().Stats.Client, GetConfig().MemberNodes, queue.Name, messageIds)
 
 	if err != nil {
 		logrus.Error(err)
@@ -165,28 +165,28 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int6
 
 	// return the partition to the parts heap, but only lock it when we have messages
 	if messageCount > 0 {
-		defer queue.Parts.PushPartition(cfg, queue.Name, partition, true)
+		defer queue.Parts.PushPartition(queue.Name, partition, true)
 	} else {
-		defer queue.Parts.PushPartition(cfg, queue.Name, partition, false)
+		defer queue.Parts.PushPartition(queue.Name, partition, false)
 	}
-	defer incrementReceiveCount(cfg.Stats.Client, queue.Name, messageCount)
-	defer recordFillRatio(cfg.Stats.Client, queue.Name, batchsize, messageCount)
+	defer incrementReceiveCount(GetConfig().Stats.Client, queue.Name, messageCount)
+	defer recordFillRatio(GetConfig().Stats.Client, queue.Name, batchsize, messageCount)
 	logrus.Debug("Message retrieved ", messageCount)
-	return queue.RetrieveMessages(messageIds, cfg), err
+	return queue.RetrieveMessages(messageIds), err
 }
 
 // Put a Message onto the queue
-func (queue *Queue) Put(cfg *Config, message string) string {
+func (queue *Queue) Put(message string) string {
 	//Grab our bucket
-	client := cfg.RiakConnection()
+	client := GetConfig().RiakConnection()
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		// Prepare the body and compress, if need be
 		var body = []byte(message)
-		var shouldCompress, _ = cfg.GetCompressedMessages(queue.Name)
+		var shouldCompress, _ = GetConfig().GetCompressedMessages(queue.Name)
 		if shouldCompress == true {
 			var compressedBody []byte
-			compressedBody, err = cfg.Compressor.Compress(body)
+			compressedBody, err = GetConfig().Compressor.Compress(body)
 			if err != nil {
 				logrus.Error("Error compressing message body")
 				logrus.Error(err)
@@ -206,7 +206,7 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 		messageObj.Data = body
 		messageObj.Store()
 
-		defer incrementMessageCount(cfg.Stats.Client, queue.Name, 1)
+		defer incrementMessageCount(GetConfig().Stats.Client, queue.Name, 1)
 		return uuid
 	} else {
 		//Actually want to handle this in some other way
@@ -215,13 +215,13 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 }
 
 // Delete a Message from the queue
-func (queue *Queue) Delete(cfg *Config, id string) bool {
-	client := cfg.RiakConnection()
+func (queue *Queue) Delete(id string) bool {
+	client := GetConfig().RiakConnection()
 	bucket, err := client.NewBucketType("messages", queue.Name)
 	if err == nil {
 		err = bucket.Delete(id)
 		if err == nil {
-			defer decrementMessageCount(cfg.Stats.Client, queue.Name, 1)
+			defer decrementMessageCount(GetConfig().Stats.Client, queue.Name, 1)
 			return true
 		} else {
 			logrus.Error(err)
@@ -235,19 +235,19 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 }
 
 // helpers
-func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
+func (queue *Queue) RetrieveMessages(ids []string) []riak.RObject {
 	var rObjectArrayChan = make(chan riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
 
 	start := time.Now()
 	// We might need to decompress the data
-	var decompressMessages, _ = cfg.GetCompressedMessages(queue.Name)
+	var decompressMessages, _ = GetConfig().GetCompressedMessages(queue.Name)
 	// foreach message id we have
 	for i := 0; i < len(ids); i++ {
 		// Kick off a go routine
 		go func() {
 			var riakKey string
-			client := cfg.RiakConnection()
+			client := GetConfig().RiakConnection()
 			bucket, _ := client.NewBucketType("messages", queue.Name)
 			// Pop a key off the rKeys channel
 			riakKey = <-rKeys
@@ -261,7 +261,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 				// If we didn't get an error, push the riak object into the objectarray channel
 			}
 			if decompressMessages == true {
-				var data, _ = cfg.Compressor.Decompress(rObject.Data)
+				var data, _ = GetConfig().Compressor.Decompress(rObject.Data)
 				rObject.Data = data
 			}
 			rObjectArrayChan <- *rObject
@@ -286,7 +286,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 		if rObject.Conflict() {
 			for _, sibling := range rObject.Siblings {
 				if len(sibling.Data) > 0 {
-					queue.Put(cfg, string(sibling.Data))
+					queue.Put(string(sibling.Data))
 				} else {
 					logrus.Debugf("sibling had no data")
 				}
@@ -304,10 +304,10 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	return returnVals
 }
 
-func (queues *Queues) syncConfig(cfg *Config) {
+func (queues *Queues) syncConfig() {
 	for {
 		logrus.Debug("syncing Queue config with Riak")
-		client := cfg.RiakConnection()
+		client := GetConfig().RiakConnection()
 		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 		if err != nil {
 			// This is likely caused by a network blip against the riak node, or the node being down
@@ -315,8 +315,7 @@ func (queues *Queues) syncConfig(cfg *Config) {
 			// skip this iteration of the config sync, and try again at the next interval
 			logrus.Error("There was an error attempting to read the from the configuration bucket")
 			logrus.Error(err)
-			//cfg.ResetRiakConnection()
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+			time.Sleep(GetConfig().Core.SyncConfigInterval * time.Millisecond)
 			continue
 		}
 
@@ -331,8 +330,7 @@ func (queues *Queues) syncConfig(cfg *Config) {
 				// skip this iteration of the config sync, and try again at the next interval
 				logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
 				logrus.Error(err)
-				//cfg.ResetRiakConnection()
-				time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+				time.Sleep(GetConfig().Core.SyncConfigInterval * time.Millisecond)
 				continue
 			}
 		}
@@ -344,14 +342,14 @@ func (queues *Queues) syncConfig(cfg *Config) {
 		if queueSet == nil {
 			//bail if there aren't any queues
 			//but not before sleeping
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
+			time.Sleep(GetConfig().Core.SyncConfigInterval * time.Second)
 			continue
 		}
 		queueSlice := queueSet.GetValue()
 		if queueSlice == nil {
 			//bail if there aren't any queues
 			//but not before sleeping
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
+			time.Sleep(GetConfig().Core.SyncConfigInterval * time.Second)
 			continue
 		}
 
@@ -363,13 +361,13 @@ func (queues *Queues) syncConfig(cfg *Config) {
 			var present bool
 			_, present = queues.QueueMap[queueName]
 			if present != true {
-				initQueueFromRiak(cfg, queueName)
+				initQueueFromRiak(queueName)
 			}
 			queuesToKeep[queueName] = true
 		}
 
 		//iterate over the topics in topics.TopicMap and delete the ones no longer used
-		topics := cfg.Topics
+		topics := GetConfig().Topics
 		for queue, _ := range queues.QueueMap {
 			var present bool
 			_, present = queuesToKeep[queue]
@@ -378,7 +376,7 @@ func (queues *Queues) syncConfig(cfg *Config) {
 					topicQueueList := topics.TopicMap[topic].ListQueues()
 					for _, topicQueue := range topicQueueList {
 						if topicQueue == string(queue) {
-							topics.TopicMap[topic].DeleteQueue(cfg, string(queue))
+							topics.TopicMap[topic].DeleteQueue(string(queue))
 						}
 					}
 				}
@@ -388,38 +386,38 @@ func (queues *Queues) syncConfig(cfg *Config) {
 
 		//sync all topics with riak
 		for _, queue := range queues.QueueMap {
-			queue.syncConfig(cfg)
+			queue.syncConfig()
 		}
 		//sleep for the configured interval
-		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+		time.Sleep(GetConfig().Core.SyncConfigInterval * time.Millisecond)
 	}
 }
 
-func initQueueFromRiak(cfg *Config, queueName string) {
-	client := cfg.RiakConnection()
+func initQueueFromRiak(queueName string) {
+	client := GetConfig().RiakConnection()
 
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	config, _ := bucket.FetchMap(queueConfigRecordName(queueName))
 
 	queue := Queue{
 		Name:   queueName,
-		Parts:  InitPartitions(cfg, queueName),
+		Parts:  InitPartitions(queueName),
 		Config: config,
 	}
 
 	// This is adding a new member to the collection, it shouldn't need a lock?
 	// TODO Keep an eye on this for emergent issues
-	cfg.Queues.QueueMap[queueName] = &queue
+	GetConfig().Queues.QueueMap[queueName] = &queue
 }
 
-func (queue *Queue) syncConfig(cfg *Config) {
+func (queue *Queue) syncConfig() {
 	//refresh the queue RDtMap
-	client := cfg.RiakConnection()
+	client := GetConfig().RiakConnection()
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 
 	rCfg, _ := bucket.FetchMap(queueConfigRecordName(queue.Name))
 	queue.updateQueueConfig(rCfg)
-	queue.Parts.syncPartitions(cfg, queue.Name)
+	queue.Parts.syncPartitions(queue.Name)
 }
 
 func (queue *Queue) updateQueueConfig(rCfg *riak.RDtMap) {

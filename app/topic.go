@@ -24,8 +24,8 @@ type Topics struct {
 	queues   *Queues
 }
 
-func InitTopics(cfg *Config, queues *Queues) Topics {
-	client := cfg.RiakConnection()
+func InitTopics() Topics {
+	client := GetConfig().RiakConnection()
 	bucket, err := client.NewBucketType("maps", "config")
 	if err != nil {
 		logrus.Error(err)
@@ -45,11 +45,11 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 	}
 	topics := Topics{
 		Config:   config,
-		riakPool: cfg.RiakPool,
-		queues:   queues,
+		riakPool: GetConfig().RiakPool,
+		queues:   GetConfig().Queues,
 		TopicMap: make(map[string]*Topic),
 	}
-	go topics.syncConfig(cfg)
+	go topics.syncConfig()
 	return topics
 }
 
@@ -72,7 +72,7 @@ func (topics *Topics) InitTopic(name string) {
 }
 
 //Broadcast the message to all listening queues and return the acked writes
-func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
+func (topic *Topic) Broadcast(message string) map[string]string {
 	queueWrites := make(map[string]string)
 	// If we haven't mapped any queues to this topic yet, this will be nil
 	topicQueues := topic.Config.FetchSet("queues")
@@ -82,7 +82,7 @@ func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 			var present bool
 			_, present = topic.queues.QueueMap[string(queue)]
 			if present == true {
-				uuid := topic.queues.QueueMap[string(queue)].Put(cfg, message)
+				uuid := topic.queues.QueueMap[string(queue)].Put(message)
 				queueWrites[string(queue)] = uuid
 			} else {
 				// Return something indicating no queue?
@@ -93,8 +93,8 @@ func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 	return queueWrites
 }
 
-func (topic *Topic) AddQueue(cfg *Config, name string) {
-	client := cfg.RiakConnection()
+func (topic *Topic) AddQueue(name string) {
+	client := GetConfig().RiakConnection()
 
 	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	recordName := topicConfigRecordName(topic.Name)
@@ -109,8 +109,8 @@ func (topic *Topic) AddQueue(cfg *Config, name string) {
 	}
 }
 
-func (topic *Topic) DeleteQueue(cfg *Config, name string) {
-	client := cfg.RiakConnection()
+func (topic *Topic) DeleteQueue(name string) {
+	client := GetConfig().RiakConnection()
 	recordName := topicConfigRecordName(topic.Name)
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	topic.Config, _ = bucket.FetchMap(recordName)
@@ -162,7 +162,7 @@ func (topic *Topic) Delete() {
 
 //helpers
 //TODO move error handling for empty config in riak to initializer
-func (topics *Topics) syncConfig(cfg *Config) {
+func (topics *Topics) syncConfig() {
 	for {
 		logrus.Debug("syncing Topic config with Riak")
 		//refresh the topic RDtMap
@@ -175,7 +175,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 			logrus.Error("There was an error attempting to read the from the configuration bucket")
 			logrus.Error(err)
 			//cfg.ResetRiakConnection()
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+			time.Sleep(GetConfig().Core.SyncConfigInterval * time.Millisecond)
 			continue
 		}
 		//fetch the map ignore error for event that map doesn't exist
@@ -189,7 +189,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 			logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
 			logrus.Error(err)
 			//cfg.ResetRiakConnection()
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+			time.Sleep(GetConfig().Core.SyncConfigInterval * time.Millisecond)
 			continue
 		}
 		//iterate the map and add or remove topics that need to be destroyed
@@ -197,7 +197,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 		if topicSlice == nil {
 			//bail if there aren't any topics
 			//but not before sleeping
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
+			time.Sleep(GetConfig().Core.SyncConfigInterval * time.Second)
 			continue
 		}
 		//Is there a better way to do this?
@@ -228,7 +228,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 			topic.syncConfig()
 		}
 		//sleep for the configured interval
-		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
+		time.Sleep(GetConfig().Core.SyncConfigInterval * time.Millisecond)
 
 	}
 }

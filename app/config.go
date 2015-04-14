@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app/compressor"
 	"github.com/Tapjoy/dynamiq/app/stats"
+	"github.com/hashicorp/memberlist"
 	"github.com/tpjg/goriakpbc"
 	"math/rand"
 	"strconv"
@@ -16,7 +17,12 @@ import (
 
 var (
 	ConfigurationOptionNotFound = errors.New("Configuration Value Not Found")
+	config                      = &Config{}
 )
+
+func GetConfig() *Config {
+	return config
+}
 
 const CONFIGURATION_BUCKET = "config"
 const QUEUE_CONFIG_NAME = "queue_config"
@@ -34,12 +40,13 @@ var SETTINGS = [...]string{VISIBILITY_TIMEOUT, PARTITION_COUNT, MIN_PARTITIONS, 
 var DEFAULT_SETTINGS = map[string]string{VISIBILITY_TIMEOUT: "30", PARTITION_COUNT: "5", MIN_PARTITIONS: "1", MAX_PARTITIONS: "10", MAX_PARTITION_AGE: "432000", COMPRESSED_MESSAGES: "false"}
 
 type Config struct {
-	Core       Core
-	Stats      Stats
-	Compressor compressor.Compressor
-	Queues     *Queues
-	RiakPool   *riak.Client
-	Topics     *Topics
+	Core        Core
+	Stats       Stats
+	Compressor  compressor.Compressor
+	Queues      *Queues
+	RiakPool    *riak.Client
+	Topics      *Topics
+	MemberNodes *memberlist.Memberlist
 }
 
 type Core struct {
@@ -64,59 +71,69 @@ type Stats struct {
 	Client        stats.StatsClient
 }
 
-func initRiakPool(cfg *Config) *riak.Client {
+func initRiakPool() {
 	rand.Seed(time.Now().UnixNano())
 	// TODO this should just be 1 HAProxy
-	hosts := []string{cfg.Core.RiakNodes}
+	hosts := []string{config.Core.RiakNodes}
 	host := hosts[rand.Intn(len(hosts))]
-	return riak.NewClientPool(host, cfg.Core.BackendConnectionPool)
+	config.RiakPool = riak.NewClientPool(host, config.Core.BackendConnectionPool)
+	return
 }
 
 func GetCoreConfig(config_file *string) (*Config, error) {
-	var cfg Config
-	err := gcfg.ReadFileInto(&cfg, *config_file)
+	err := gcfg.ReadFileInto(config, *config_file)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	if len(cfg.Core.SeedServer) == 0 {
+	if len(config.Core.SeedServer) == 0 {
 		logrus.Fatal("The list of seedservers was empty")
 	}
 
-	cfg.Core.SeedServers = strings.Split(cfg.Core.SeedServer, ",")
-	for i, x := range cfg.Core.SeedServers {
-		cfg.Core.SeedServers[i] = x + ":" + strconv.Itoa(cfg.Core.SeedPort)
+	config.Core.SeedServers = strings.Split(config.Core.SeedServer, ",")
+	for i, x := range config.Core.SeedServers {
+		config.Core.SeedServers[i] = x + ":" + strconv.Itoa(config.Core.SeedPort)
 	}
 
-	cfg.RiakPool = initRiakPool(&cfg)
-	cfg.Queues = loadQueuesConfig(&cfg)
-	switch cfg.Stats.Type {
+	// This will join the node to the cluster
+	config.MemberNodes, _, err = InitMemberList(config.Core.Name, config.Core.Port, config.Core.SeedServers, config.Core.SeedPort)
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	// This will place a fully prepared riak connection pool onto the config object
+	initRiakPool()
+
+	// This will load all the queue config from Riak and place it onto the config object
+	loadQueuesConfig()
+
+	switch config.Stats.Type {
 	case "statsd":
-		cfg.Stats.Client = stats.NewStatsdClient(cfg.Stats.Address, cfg.Stats.Prefix, time.Second*time.Duration(cfg.Stats.FlushInterval))
+		config.Stats.Client = stats.NewStatsdClient(config.Stats.Address, config.Stats.Prefix, time.Second*time.Duration(config.Stats.FlushInterval))
 	default:
-		cfg.Stats.Client = stats.NewNOOPClient()
+		config.Stats.Client = stats.NewNOOPClient()
 	}
 
 	// Currently we only support zlib, but we may support others
 	// Here is where we'd detect and inject
-	cfg.Compressor = compressor.NewZlibCompressor()
+	config.Compressor = compressor.NewZlibCompressor()
 
-	cfg.Core.LogLevel, err = logrus.ParseLevel(cfg.Core.LogLevelString)
+	config.Core.LogLevel, err = logrus.ParseLevel(config.Core.LogLevelString)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	go cfg.Queues.syncConfig(&cfg)
-	return &cfg, err
+	go config.Queues.syncConfig()
+	return config, err
 }
 
-func loadQueuesConfig(cfg *Config) *Queues {
+func loadQueuesConfig() {
 	// Create the Queues Config struct
 	queuesConfig := Queues{
 		QueueMap: make(map[string]*Queue),
 	}
 	// Get the queues
-	client := cfg.RiakConnection()
+	client := config.RiakConnection()
 	// TODO: We should be handling errors here
 	// Get the bucket holding the map of config data
 	configBucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
@@ -126,18 +143,18 @@ func loadQueuesConfig(cfg *Config) *Queues {
 		logrus.Errorf("Error trying to get maps bucket type: %s", err)
 	}
 	// Fetch the object for holding the set of queues
-	config, err := configBucket.FetchMap(QUEUE_CONFIG_NAME)
+	qconfigObj, err := configBucket.FetchMap(QUEUE_CONFIG_NAME)
 	if err != nil {
 		logrus.Errorf("Error trying to get queue config bucket: %s", err)
 	}
-	queuesConfig.Config = config
+	queuesConfig.Config = qconfigObj
 
 	// AddSet implicitly calls fetch set if the set already exists
-	queueSet := config.AddSet(QUEUE_SET_NAME)
+	queueSet := qconfigObj.AddSet(QUEUE_SET_NAME)
 	if queueSet == nil {
 		queueSet.Add([]byte("default_queue"))
-		config.Store()
-		config, _ = configBucket.FetchMap(QUEUE_CONFIG_NAME)
+		qconfigObj.Store()
+		qconfigObj, _ = configBucket.FetchMap(QUEUE_CONFIG_NAME)
 	}
 	// For each queue we have in the system
 	for _, elem := range queueSet.GetValue() {
@@ -149,14 +166,14 @@ func loadQueuesConfig(cfg *Config) *Queues {
 		queue := &Queue{
 			Name:   name,
 			Config: configMap,
-			Parts:  InitPartitions(cfg, name),
+			Parts:  InitPartitions(name),
 		}
 		// TODO: We should be handling errors here
 		// Set the queue in the queue map
 		queuesConfig.QueueMap[name] = queue
 	}
-	// Return the completed Queue cache of settings
-	return &queuesConfig
+	// Set the completed Queue cache of settings
+	config.Queues = &queuesConfig
 }
 
 func (cfg *Config) InitializeQueue(queueName string) error {
@@ -171,7 +188,7 @@ func (cfg *Config) InitializeQueue(queueName string) error {
 	// Now, add the queue into our memory-cache of data
 	cfg.Queues.QueueMap[queueName] = &Queue{
 		Name:   queueName,
-		Parts:  InitPartitions(cfg, queueName),
+		Parts:  InitPartitions(queueName),
 		Config: configMap,
 	}
 	return err
