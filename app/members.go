@@ -23,6 +23,10 @@ func InitMemberList(name string, port int, seedServers []string, seedPort int) (
 	prioritizedServers := prioritizeSeedServers(myName, seedServers)
 	nodesJoined, err := list.Join(prioritizedServers)
 
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	for _, member := range list.Members() {
 		logrus.Printf("Member %s %s\n", member.Name, member.Addr)
 	}
