@@ -41,7 +41,8 @@ func InitPartitions(cfg *Config, queueName string) *Partitions {
 func (part *Partitions) PartitionCount() int {
 	return part.partitionCount
 }
-func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, *Partition, error) {
+
+func GetNodePartitionRange(cfg *Config, list *memberlist.Memberlist) (int, int) {
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
 
@@ -49,6 +50,13 @@ func (part *Partitions) GetPartition(cfg *Config, queueName string, list *member
 	step := math.MaxInt64 / nodeCount
 	nodeBottom := nodePosition * step
 	nodeTop := (nodePosition + 1) * step
+	return nodeBottom, nodeTop
+}
+
+func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, *Partition, error) {
+	//get the top and bottom for this node
+	nodeBottom, nodeTop := GetNodePartitionRange(cfg, list)
+
 	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
 	if err != nil && err.Error() != NOPARTITIONS {
 		logrus.Error(err)

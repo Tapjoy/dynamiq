@@ -88,6 +88,11 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 			return return_string
 		})
+
+		m.Get("/status/partitionrange", func(r render.Render, params martini.Params) {
+			bottom, top := GetNodePartitionRange(cfg, list)
+			r.JSON(200, map[string]interface{}{"bottom": strconv.Itoa(bottom), "top": strconv.Itoa(top)})
+		})
 		// END STATUS / STATISTICS API BLOCK
 
 		// CONFIGURATION API BLOCK
