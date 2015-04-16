@@ -10,8 +10,8 @@ import (
 	"github.com/martini-contrib/render"
 	"net/http"
 	"strconv"
-	"time"
 	"strings"
+	"time"
 )
 
 // TODO Should this live in the config package?
@@ -88,6 +88,11 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 			return return_string
 		})
+
+		m.Get("/status/partitionrange", func(r render.Render, params martini.Params) {
+			bottom, top := GetNodePartitionRange(cfg, list)
+			r.JSON(200, map[string]interface{}{"bottom": strconv.Itoa(bottom), "top": strconv.Itoa(top)})
+		})
 		// END STATUS / STATISTICS API BLOCK
 
 		// CONFIGURATION API BLOCK
@@ -103,10 +108,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 		})
 
-
 		m.Delete("/queues/:queue", func(r render.Render, params martini.Params) {
 			var present bool
-			_, present = queues.QueueMap[params["queue"]]			
+			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
 				queues.DeleteQueue(params["queue"], cfg)
 				deleted := true
@@ -369,6 +373,19 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			}
 
 			r.JSON(200, queues.QueueMap[params["queue"]].Delete(cfg, params["messageId"]))
+		})
+
+		m.Delete("/queues/:queue/messages/:messageIds", func(r render.Render, params martini.Params) {
+			var present bool
+			_, present = queues.QueueMap[params["queue"]]
+			if present != true {
+				r.JSON(404, map[string]interface{}{"error": fmt.Sprintf("There is no queue named %s", params["queue"])})
+			} else {
+				ids := strings.Split(params["messageIds"], ",")
+				// The error returned here is already logged during the call
+				errorCount, _ := queues.QueueMap[params["queue"]].BatchDelete(cfg, ids)
+				r.JSON(200, map[string]interface{}{"deleted": len(ids) - errorCount})
+			}
 		})
 		// DATA INTERACTION API BLOCK
 	})
