@@ -358,10 +358,10 @@ func (queues *Queues) syncConfig(cfg *Config) {
 				continue
 			}
 		}
-		queues.updateQueuesConfig(queuesConfig)
+		queues.updateConfig(queuesConfig)
 
 		//iterate the map and add or remove topics that need to be destroyed
-		queueSet := queues.getQueuesConfig().AddSet(QUEUE_SET_NAME)
+		queueSet := queues.getConfig().AddSet(QUEUE_SET_NAME)
 
 		if queueSet == nil {
 			//bail if there aren't any queues
@@ -440,29 +440,29 @@ func (queue *Queue) syncConfig(cfg *Config) {
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 
 	rCfg, _ := bucket.FetchMap(queueConfigRecordName(queue.Name))
-	queue.updateQueueConfig(rCfg)
+	queue.updateConfig(rCfg)
 	queue.Parts.syncPartitions(cfg, queue.Name)
 }
 
-func (queue *Queue) updateQueueConfig(rCfg *riak.RDtMap) {
+func (queue *Queue) updateConfig(rCfg *riak.RDtMap) {
 	queue.Lock()
 	defer queue.Unlock()
 	queue.Config = rCfg
 }
 
-func (queue *Queue) getQueueConfig() *riak.RDtMap {
+func (queue *Queue) getConfig() *riak.RDtMap {
 	queue.RLock()
 	defer queue.RUnlock()
 	return queue.Config
 }
 
-func (queues *Queues) updateQueuesConfig(rCfg *riak.RDtMap) {
+func (queues *Queues) updateConfig(rCfg *riak.RDtMap) {
 	queues.Lock()
 	defer queues.Unlock()
 	queues.Config = rCfg
 }
 
-func (queues *Queues) getQueuesConfig() *riak.RDtMap {
+func (queues *Queues) getConfig() *riak.RDtMap {
 	queues.RLock()
 	defer queues.RUnlock()
 	return queues.Config

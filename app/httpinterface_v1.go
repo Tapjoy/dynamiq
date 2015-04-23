@@ -101,7 +101,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			var present bool
 			_, present = topics.TopicMap[params["topic"]]
 			if present == true {
-				deleted := topics.DeleteTopic(params["topic"])
+				deleted := topics.DeleteTopic(cfg, params["topic"])
 				r.JSON(200, map[string]interface{}{"Deleted": deleted})
 			} else {
 				r.JSON(404, map[string]interface{}{"error": "Topic did not exist."})
