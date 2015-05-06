@@ -32,6 +32,9 @@ type Queues struct {
 	Config *riak.RDtMap
 	// Mutex for protecting rw access to the Config object
 	sync.RWMutex
+	// Channels / Timer for syncing the config
+	syncScheduler *time.Ticker
+	syncKiller    chan struct{}
 }
 
 type Queue struct {
@@ -327,94 +330,105 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 }
 
 func (queues *Queues) syncConfig(cfg *Config) {
-	for {
-		logrus.Debug("syncing Queue config with Riak")
-		client := cfg.RiakConnection()
-		bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-		if err != nil {
+	logrus.Debug("syncing Queue config with Riak")
+	client := cfg.RiakConnection()
+	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	if err != nil {
+		// This is likely caused by a network blip against the riak node, or the node being down
+		// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
+		// skip this iteration of the config sync, and try again at the next interval
+		logrus.Error("There was an error attempting to read the from the configuration bucket")
+		logrus.Error(err)
+		return
+	}
+
+	queuesConfig, err := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	if err != nil {
+		if err.Error() == "Object not found" {
+			// This means there are no queues yet
+			// We don't need to log this, and we don't need to get held up on it.
+		} else {
 			// This is likely caused by a network blip against the riak node, or the node being down
 			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
 			// skip this iteration of the config sync, and try again at the next interval
-			logrus.Error("There was an error attempting to read the from the configuration bucket")
+			logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
 			logrus.Error(err)
-			//cfg.ResetRiakConnection()
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
-			continue
+			return
 		}
+	}
+	queues.updateConfig(queuesConfig)
 
-		queuesConfig, err := bucket.FetchMap(QUEUE_CONFIG_NAME)
-		if err != nil {
-			if err.Error() == "Object not found" {
-				// This means there are no queues yet
-				// We don't need to log this, and we don't need to get held up on it.
-			} else {
-				// This is likely caused by a network blip against the riak node, or the node being down
-				// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
-				// skip this iteration of the config sync, and try again at the next interval
-				logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
-				logrus.Error(err)
-				//cfg.ResetRiakConnection()
-				time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
-				continue
-			}
+	//iterate the map and add or remove topics that need to be destroyed
+	queueSet := queues.getConfig().AddSet(QUEUE_SET_NAME)
+
+	if queueSet == nil {
+		//bail if there aren't any queues
+		//but not before sleeping
+		return
+	}
+	queueSlice := queueSet.GetValue()
+	if queueSlice == nil {
+		//bail if there aren't any queues
+		//but not before sleeping
+		return
+	}
+
+	//Is there a better way to do this?
+	//iterate over the queues in riak and add the missing ones
+	queuesToKeep := make(map[string]bool)
+	for _, queue := range queueSlice {
+		queueName := string(queue)
+		var present bool
+		_, present = queues.QueueMap[queueName]
+		if present != true {
+			initQueueFromRiak(cfg, queueName)
 		}
-		queues.updateConfig(queuesConfig)
+		queuesToKeep[queueName] = true
+	}
 
-		//iterate the map and add or remove topics that need to be destroyed
-		queueSet := queues.getConfig().AddSet(QUEUE_SET_NAME)
-
-		if queueSet == nil {
-			//bail if there aren't any queues
-			//but not before sleeping
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
-			continue
-		}
-		queueSlice := queueSet.GetValue()
-		if queueSlice == nil {
-			//bail if there aren't any queues
-			//but not before sleeping
-			time.Sleep(cfg.Core.SyncConfigInterval * time.Second)
-			continue
-		}
-
-		//Is there a better way to do this?
-		//iterate over the queues in riak and add the missing ones
-		queuesToKeep := make(map[string]bool)
-		for _, queue := range queueSlice {
-			queueName := string(queue)
-			var present bool
-			_, present = queues.QueueMap[queueName]
-			if present != true {
-				initQueueFromRiak(cfg, queueName)
-			}
-			queuesToKeep[queueName] = true
-		}
-
-		//iterate over the topics in topics.TopicMap and delete the ones no longer used
-		topics := cfg.Topics
-		for queue, _ := range queues.QueueMap {
-			var present bool
-			_, present = queuesToKeep[queue]
-			if present != true {
-				for topic, _ := range topics.TopicMap {
-					topicQueueList := topics.TopicMap[topic].ListQueues()
-					for _, topicQueue := range topicQueueList {
-						if topicQueue == string(queue) {
-							topics.TopicMap[topic].DeleteQueue(cfg, string(queue))
-						}
+	//iterate over the topics in topics.TopicMap and delete the ones no longer used
+	topics := cfg.Topics
+	for queue, _ := range queues.QueueMap {
+		var present bool
+		_, present = queuesToKeep[queue]
+		if present != true {
+			for topic, _ := range topics.TopicMap {
+				topicQueueList := topics.TopicMap[topic].ListQueues()
+				for _, topicQueue := range topicQueueList {
+					if topicQueue == string(queue) {
+						topics.TopicMap[topic].DeleteQueue(cfg, string(queue))
 					}
 				}
-				delete(queues.QueueMap, queue)
+			}
+			delete(queues.QueueMap, queue)
+		}
+	}
+
+	//sync all topics with riak
+	for _, queue := range queues.QueueMap {
+		queue.syncConfig(cfg)
+	}
+}
+
+func (queues *Queues) scheduleSync(cfg *Config) {
+	// If we haven't created it yet, create the ticker
+	if queues.syncScheduler == nil {
+		queues.syncScheduler = time.NewTicker(cfg.Core.SyncConfigInterval * time.Millisecond)
+	}
+	// Go routine to listen to either the scheduler or the killer
+	go func(config *Config) {
+		for {
+			select {
+			// Check to see if we have a tick
+			case <-queues.syncScheduler.C:
+				queues.syncConfig(cfg)
+			// Check to see if we've been stopped
+			case <-queues.syncKiller:
+				queues.syncScheduler.Stop()
+				return
 			}
 		}
-
-		//sync all topics with riak
-		for _, queue := range queues.QueueMap {
-			queue.syncConfig(cfg)
-		}
-		//sleep for the configured interval
-		time.Sleep(cfg.Core.SyncConfigInterval * time.Millisecond)
-	}
+	}(cfg)
 }
 
 func initQueueFromRiak(cfg *Config, queueName string) {

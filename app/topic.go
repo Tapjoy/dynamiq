@@ -22,9 +22,10 @@ type Topics struct {
 	// global topic configuration, should contain list of all active topics
 	Config *riak.RDtMap
 	// topic map
-	TopicMap      map[string]*Topic
-	riakPool      *riak.Client
-	queues        *Queues
+	TopicMap map[string]*Topic
+	riakPool *riak.Client
+	queues   *Queues
+	// Channels / Timer for syncing the config
 	syncScheduler *time.Ticker
 	syncKiller    chan struct{}
 	// Mutex for protecting rw access to the Config object
@@ -220,12 +221,17 @@ func (topics *Topics) syncConfig(cfg *Config) {
 	//Question is this thread safe...?
 	topicsConfig, err := bucket.FetchMap("topicsConfig")
 	if err != nil {
-		// This is likely caused by a network blip against the riak node, or the node being down
-		// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
-		// skip this iteration of the config sync, and try again at the next interval
-		logrus.Error("There was an error attempting to read from the queue configuration map in the configuration bucket")
-		logrus.Error(err)
-		return
+		if err.Error() == "Object not found" {
+			// This means there are no topics yet
+			// We don't need to log this, and we don't need to get held up on it.
+		} else {
+			// This is likely caused by a network blip against the riak node, or the node being down
+			// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
+			// skip this iteration of the config sync, and try again at the next interval
+			logrus.Error("There was an error attempting to read from the topic configuration map in the configuration bucket")
+			logrus.Error(err)
+			return
+		}
 	}
 	topics.updateConfig(topicsConfig)
 
@@ -273,8 +279,9 @@ func (topic *Topic) syncConfig() {
 	}
 	recordName := topicConfigRecordName(topic.Name)
 	rCfg, err := bucket.FetchMap(recordName)
-	if err != nil {
-		logrus.Error(rCfg)
+	// We need to remove the notion of the default topic, as we no longer need it
+	// For older installations that still have this topic, lets prevent it from being noisy
+	if err != nil && topic.Name != "default_topic" {
 		logrus.Error(err)
 	}
 	topic.updateConfig(rCfg)

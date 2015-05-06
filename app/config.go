@@ -106,7 +106,7 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 		logrus.Fatal(err)
 	}
 
-	go cfg.Queues.syncConfig(&cfg)
+	go cfg.Queues.scheduleSync(&cfg)
 	return &cfg, err
 }
 
