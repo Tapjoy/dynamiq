@@ -1,7 +1,7 @@
 Dynamiq
 =========
 
-A simple implimentation of a queue on top of Riak 2.0
+A simple implementation of a queue on top of Riak 2.0
 
 Disclaimer
 ==========
