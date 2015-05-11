@@ -344,7 +344,6 @@ Client Libraries
 ================
 
 * Ruby - https://github.com/Tapjoy/dynamiq-ruby-client
-* Scala - https://github.com/Tapjoy/dynamiq-scala-client
 
 Tuning
 ==========
