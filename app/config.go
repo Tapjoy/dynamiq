@@ -106,7 +106,7 @@ func GetCoreConfig(config_file *string) (*Config, error) {
 		logrus.Fatal(err)
 	}
 
-	go cfg.Queues.syncConfig(&cfg)
+	go cfg.Queues.scheduleSync(&cfg)
 	return &cfg, err
 }
 
@@ -280,7 +280,7 @@ func (cfg *Config) getQueueSetting(paramName string, queueName string) (string, 
 	// While we wait, go and read from Riak directly
 	if cfg.Queues != nil {
 		if _, ok := cfg.Queues.QueueMap[queueName]; ok {
-			regValue := cfg.Queues.QueueMap[queueName].getQueueConfig().FetchRegister(paramName)
+			regValue := cfg.Queues.QueueMap[queueName].getConfig().FetchRegister(paramName)
 			if regValue != nil {
 				value, err = registerValueToString(regValue)
 				if err != nil {
