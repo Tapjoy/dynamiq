@@ -44,6 +44,7 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 	}
 	if config.FetchSet("topics") == nil {
 		topicSet := config.AddSet("topics")
+		// TODO Investigate if this is still the case
 		//there's a bug in the protobufs client/cant have an empty set
 		topicSet.Add([]byte("default_topic"))
 		err = config.Store()
@@ -62,6 +63,12 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 }
 
 func (topics *Topics) InitTopic(name string) {
+	// TODO refactor the behavior of this method into 2 methods, as described below
+	// Currently, this is used for 2 related but different purposes:
+	// 1. Create new topics
+	// 2. Populate the initial list of topics during the syncConfig boot up
+	// We should split the use cases so we don't do excess calls to Riak when booting up
+	// to re-save the topic config and topics config. As-is, there is no detriment to the save calls, it's just wasted time
 	client := topics.riakPool
 	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
 	config, _ := bucket.FetchMap(topicConfigRecordName(name))
@@ -72,6 +79,10 @@ func (topics *Topics) InitTopic(name string) {
 	topic.riakPool = topics.riakPool
 	topic.queues = topics.queues
 	topics.TopicMap[name] = topic
+
+	// Save the topic level configuration object
+	// Currently, we do not have any options here, marked for future use
+	topic.Config.Store()
 
 	// Add the queue to the riak store
 	topics.Config.FetchSet("topics").Add([]byte(name))
