@@ -6,7 +6,7 @@ A simple implementation of a queue on top of Riak 2.0
 Disclaimer
 ==========
 
-Dynamiq is currently in use in production at Tapjoy. However, the product is still considered to be a beta offering, which comes with no gaurentees around the interfaces or behaviors provided in whatever the "current" version is.
+Dynamiq is currently in use in production at Tapjoy. However, the product is still considered to be a beta offering, which comes with no guarantees around the interfaces or behaviors provided in whatever the "current" version is.
 
 We encourage interested parties to use Dynamiq, understanding that prior to an official v1 release, things could change. 
 
@@ -15,11 +15,11 @@ Caveat Emptor
 What is Dynamiq?
 ==========
 
-Dynamiq is a distributed databag, acting as a queue. It's written in golang, and run in a cluster ontop of Riak 2.0. 
+Dynamiq is a distributed databag, acting as a queue. It's written in golang, and run in a cluster on top of Riak 2.0. 
 
 It exposes a simple REST API for publishing to topics and directly enqueueing to queues, as well as receiving batches of messages at a time.
 
-Dynamiq acts as both a simple queueing application, as well as a topic-fanout system. Simply, you can create topics and queues, subscribe queues to topics, and publish messages either to topics (which will fanout to all of their queues) or to queues directly (which will only enqueue to that specific queue).
+Dynamiq acts as both a simple queueing application, as well as a topic-fanout system. Simply, you can create topics and queues, subscribe queues to topics, and publish messages either to topics (which will fan out to all of their queues) or to queues directly (which will only enqueue to that specific queue).
 
 It provides at-least once delivery semantics, which are governed by "partitions" - slices of the overall total range of all possibly keys, broken up by the number of nodes in the cluster, each node holding the configured number of partitions for that queue. When a batch of messages are received from Dynamiq, the partition they came from is considered locked out for delivery, which will expire once the Visibility Timeout on that queue expires. When that timeout expires, any un-acknowledged messages are available to be served again.
 
@@ -35,7 +35,7 @@ The former is likely a more realistic approach than the latter
 Why Dynamiq?
 ==========
 
-The main design ideal of Dynamiq is to act as a drop-in replacement for the Amazons SNS / SQS services, which can become expensive at scale, both in terms of price as well as latency.
+The main design ideal of Dynamiq is to act as a drop-in replacement for the Amazon's SNS / SQS services, which can become expensive at scale, both in terms of price as well as latency.
 
 Getting Started
 =========
@@ -48,7 +48,7 @@ First, you'll need golang installed. You can find the instructions [here](https:
 
 If you've never worked with golang before, you should take some time to familiarize yourself with how go expects to work from a development standpoint, with regard to the GOROOT / GOPATH environment variables and where your go code is actually located on disk.
 
-Second, you'll need the code for Dynamiq itself. Because of golangs highly opinionated nature, you should avoid cloning the Dynamiq repo directly, and instead use gos built in cloning mechanism, "go get".
+Second, you'll need the code for Dynamiq itself. Because of golang's highly opinionated nature, you should avoid cloning the Dynamiq repo directly, and instead use go's built in cloning mechanism, "go get".
 
 ```
 go get github.com/Tapjoy/dynamiq
@@ -71,7 +71,7 @@ Core
 ------
 * name - The name of the current node. It's important that this name be in the same format as the names in the "seedserver" option, which is a hostname or ip_address
 * port - The port it will listen on for incoming membership traffic
-* seedserver - A comma-delimited list of additional nodes in the cluster. This uses [hashicorp/memberlist](http://github.com/hashicorp/memberlist) which utilizes a modified SWIM protocol for node discovery. These should be hostnames or ipaddresses that can be discovered over the network. You can include the current server in this list - Dynamiq will filter it out if found.
+* seedserver - A comma-delimited list of additional nodes in the cluster. This uses [hashicorp/memberlist](http://github.com/hashicorp/memberlist) which utilizes a modified SWIM protocol for node discovery. These should be hostnames or IP addresses that can be discovered over the network. You can include the current server in this list - Dynamiq will filter it out if found.
 * seedport - The port to talk to other memberlist nodes over
 * httpport - The port to server HTTP traffic over
 * riaknodes - A comma-delimited list of Riak nodes to speak to
@@ -107,7 +107,7 @@ Eventually, you'll want to run Dynamiq in a cluster in a production or testing e
 
 You'll likely want to front your cluster with something like HAProxy or Nginx. How to do such a thing is out of scope for this document.
 
-You'll need to provide Dynamiq with the address of atleast one other node in the "seedserver" field. Keep the following recomendations in mind when providing these values:
+You'll need to provide Dynamiq with the address of at least one other node in the "seedserver" field. Keep the following recommendations in mind when providing these values:
 
 * It is better to provide the entire cluster, as opposed to a single node, so that Dynamiq can attempt to talk to additional nodes if the first in the list is unavailable initially
 * You can, for the sake of convenience, put the current node in this list so long as you have provided the same value in the "name" value. This is because Dynamiq will filter itself from the list, and prioritize the node immediately following ours in the list, alphabetically speaking. This is to minimize the impact of all nodes trying to talk to the same node at once as a single point of failure
@@ -122,7 +122,7 @@ Dynamiq natively provides no security, authentication, or authorization services
 REST API
 ============
 
-Dynamiq supports a REST API for communicating between clients and Dynamiq. The current API (v1) is not perfectly RESTful in it's nature, due to it's evolving naturally and quickly during the initial development of Dynamiq. Some endpoints return a simple string, others return a JSON object. 
+Dynamiq supports a REST API for communicating between clients and Dynamiq. The current API (v1) is not perfectly RESTful in its nature, due to it's evolving naturally and quickly during the initial development of Dynamiq. Some endpoints return a simple string, others return a JSON object. 
 
 It can, however, be considered "Stable", in that we will only continue to add new routes which behave like old ones, and will not modify or remove existing v1 routes or behaviors. 
 
@@ -140,7 +140,7 @@ An overhauled v2 of this API, containing more RESTful routes and a consistent re
 
 * Response Code: 200
 * Response: a JSON array with the list of subscribed Queues as strings
-* Result: Sucesfully retrieved a list of Queues mapped to this Topic
+* Result: Successfully retrieved a list of Queues mapped to this Topic
 
 ### PUT /topics/:topic_name
 
@@ -279,14 +279,14 @@ Because it is possible to try to delete a message which was already deleted, we 
 ### DELETE /topics/:topic_name/queues/:queue_name
 
 * Response Code: 200
-* Response: a JSON object containing the key "Qeueus" and housing a list of all queues, minus hte provided one, subscribed to the provided topic
+* Response: a JSON object containing the key "Queues" and housing a list of all queues, minus the provided one, subscribed to the provided topic
 * Result: The provided queue was removed from the provided topics description list
 
 ### PATCH /queues/:queue_name/
 
 A note about the configuration endpoint for queues:
 
-Golang is very particular about it's data types, specifically parsing them from JSON. Providing an integer value as a string will result in a nil value. Be very careful about providing the right datatypes in the right places.
+Golang is very particular about its data types, specifically parsing them from JSON. Providing an integer value as a string will result in a nil value. Be very careful about providing the right datatypes in the right places.
 
 #### Example Request Body
 
@@ -309,7 +309,7 @@ Golang is very particular about it's data types, specifically parsing them from 
 Here is a list of params that you can optionally include in a configuration update
 
 * Visibility Timeout
- * Controls how long messages recently sent are considered "out" before becoming available to be re-sent. This is the primary timeout on the "at-least once" aspect of Dynamiq
+ * Controls how long messages recently sent are considered "out" before becoming available to be re-sent. This is the primary timeout on the "at-least-once" aspect of Dynamiq
 * Max Partitions
  * Controls the upper bound on the number of partitions used to divide and lock the messages being sent. A higher amount means more granularity in making messages available
 * Min Partitions
@@ -325,7 +325,7 @@ Changing any of these values will result in an immediate write to Riak ensuring 
 Dynamiq and Statistics
 ======================
 
-Dynamiq has the ability to publish to any StatsD equivalent service a number of metrics around the useage of your queues. Currently, some of the metrics are not 100% accurate, but can still be used to get a relative baseline for your queues health. We are continueing to work on and improve how these counters are handled in Dynamiq
+Dynamiq has the ability to publish to any StatsD equivalent service a number of metrics around the useage of your queues. Currently, some of the metrics are not 100% accurate, but can still be used to get a relative baseline for your queues health. We are continuing to work on and improve how these counters are handled in Dynamiq
 
 * Fill Rate: fill.count
  * For a given batch B, Fill Rate represents the % of B that was fulfilled by the request. For example, if B is 200, and the actual messages returned number 50, then Fill Rate is 25%
@@ -338,7 +338,7 @@ Dynamiq has the ability to publish to any StatsD equivalent service a number of 
 * Received : received.count
  * The number of messages received by a consuming client of Dynamiq
 * Deleted : deleted.count
- * The number of messages acknolwedged by a consuming client of Dynamiq
+ * The number of messages acknowledged by a consuming client of Dynamiq
 
 Client Libraries
 ================
@@ -348,7 +348,7 @@ Client Libraries
 Tuning
 ==========
 
-When it comes to tuning Dynamiq, there are primarily 3 things to think about (which interplay with eachother tightly).
+When it comes to tuning Dynamiq, there are primarily 3 things to think about (which interplay with each other tightly).
 
 * Visibility Timeout
 * Max Partitions
@@ -371,13 +371,13 @@ Internally, Dynamiq assigns an id to each message it receives. Using this id as 
 
 Given my number of nodes N, the upperbound of my keyspace K (which is the maximum value of an int64, or roughly 9.223 X 10^18), each individual node is responsible for a theoretical maximum of K / N messages.
 
-Lets say I'm Node N of 5. We're responsible for roughly 1.8 X 10^18 messages total (per queue), of which I am aware of the lower and upper bound of my range of the keyspace (LB and UB, respectively). 
+Let's say I'm Node N of 5. We're responsible for roughly 1.8 X 10^18 messages total (per queue), of which I am aware of the lower and upper bound of my range of the keyspace (LB and UB, respectively). 
 
 From here, I'm able to serve any of those messages. Each of the queues that I'm holding has a configured number of Partitions, globally.
 
 Given the same number of nodes N, and the total partitions P, each node is responsible for N / P partitions
 
-Lets say a given queue has 1000 partitions. As node N of 5, I'm responsible for 200 of those partitions. Each partition will be the size of K / P, or 9.233 X 10^15 messages. My first partition will start at LB, while my last will end at UB. Each partition in between will hold an even slice of my subset of the keyspace.
+Let's say a given queue has 1000 partitions. As node N of 5, I'm responsible for 200 of those partitions. Each partition will be the size of K / P, or 9.233 X 10^15 messages. My first partition will start at LB, while my last will end at UB. Each partition in between will hold an even slice of my subset of the keyspace.
 
 Partitions will be served to clients such that Partitions which have not recently been used have a direct priority over ones that have been used. In effect, each partition will be served exactly once before any will be served a second time.
 
