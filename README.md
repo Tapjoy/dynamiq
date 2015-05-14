@@ -21,7 +21,9 @@ It exposes a simple REST API for publishing to topics and directly enqueueing to
 
 Dynamiq acts as both a simple queueing application, as well as a topic-fanout system. Simply, you can create topics and queues, subscribe queues to topics, and publish messages either to topics (which will fan out to all of their queues) or to queues directly (which will only enqueue to that specific queue).
 
-It provides at-least once delivery semantics, which are governed by "partitions" - slices of the overall total range of all possibly keys, broken up by the number of nodes in the cluster, each node holding the configured number of partitions for that queue. When a batch of messages are received from Dynamiq, the partition they came from is considered locked out for delivery, which will expire once the Visibility Timeout on that queue expires. When that timeout expires, any un-acknowledged messages are available to be served again.
+It provides at-least once delivery semantics, which are governed by "partitions" - slices of the overall total range of all possible keys, broken up by the number of nodes in the cluster, each node holding the configured number of partitions for that queue. 
+
+When a batch of messages are received from Dynamiq, the partition they came from is considered locked-out for delivery, which will expire once the Visibility Timeout on that queue expires. When that timeout expires, any un-acknowledged messages are available to be served again.
 
 At-Least-Once and De-Duplication
 ===========
