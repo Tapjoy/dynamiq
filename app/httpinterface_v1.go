@@ -1,29 +1,36 @@
 package app
 
+// V2 TODO: The status codes and responses from this API are incredibly inconsistent
+// For V2, we need to standardize on 1 a consistent pattern for responding, which
+// should adhere strictly to the concept of a restful API
+
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/go-martini/martini"
 	"github.com/hashicorp/memberlist"
 	"github.com/martini-contrib/binding"
 	"github.com/martini-contrib/render"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // TODO Should this live in the config package?
 // Using pointers lets us differentiate between a natural 0, and an int-default 0
 // omitempty tells it to ignore anything where the name was provided, but an empty value
 // inside of a request body.
+
+// ConfigRequest is
 type ConfigRequest struct {
-	VisibilityTimeout  *float64 `json:"visibility_timeout,omitempty"`
-	MinPartitions      *int     `json:"min_partitions,omitempty"`
-	MaxPartitions      *int     `json:"max_partitions,omitempty"`
-	MaxPartitionAge    *float64 `json:"max_partition_age,omitempty"`
-	CompressedMessages *bool    `json:"compressed_messages,omitempty"`
+	VisibilityTimeout  *float64 `json:"VisibilityTimeout,omitempty"`
+	MinPartitions      *int     `json:"MinPartitions,omitempty"`
+	MaxPartitions      *int     `json:"MaxPartitions,omitempty"`
+	MaxPartitionAge    *float64 `json:"MaxPartitionAge,omitempty"`
+	CompressedMessages *bool    `json:"CompressedMessages,omitempty"`
 }
 
 // TODO make message definitions more explicit
@@ -63,13 +70,15 @@ func dynamiqMartini(cfg *Config) *martini.ClassicMartini {
 	m.Use(martini.Static("public"))
 	m.MapTo(r, (*martini.Routes)(nil))
 	m.Action(r.Handle)
-	return &martini.ClassicMartini{m, r}
+	return &martini.ClassicMartini{Martini: m, Router: r}
 }
 
-type HTTP_API_V1 struct {
+// HTTPApiV1 is
+type HTTPApiV1 struct {
 }
 
-func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
+// InitWebserver is
+func (h HTTPApiV1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	// tieing our Queue to HTTP interface == bad we should move this somewhere else
 	// Queues.Queues is dumb. Need a better name-chain
 	queues := cfg.Queues
@@ -82,11 +91,11 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 	m.Group("/v1", func(r martini.Router) {
 		// STATUS / STATISTICS API BLOCK
 		m.Get("/status/servers", func() string {
-			return_string := ""
+			status := ""
 			for _, member := range list.Members() {
-				return_string += fmt.Sprintf("Member: %s %s\n", member.Name, member.Addr)
+				status += fmt.Sprintf("Member: %s %s\n", member.Name, member.Addr)
 			}
-			return return_string
+			return status
 		})
 
 		m.Get("/status/partitionrange", func(r render.Render, params martini.Params) {
@@ -201,8 +210,8 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				}
 			}
 
-			if configRequest.MaxPartitions != nil {
-				err = cfg.SetMaxPartitions(params["queue"], *configRequest.MaxPartitions)
+			if configRequest.MinPartitions != nil {
+				err = cfg.SetMinPartitions(params["queue"], *configRequest.MinPartitions)
 				if err != nil {
 					logrus.Println(err)
 					r.JSON(500, map[string]interface{}{"error": err.Error()})
@@ -236,7 +245,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 
 		m.Get("/topics", func(r render.Render) {
 			topicList := make([]string, 0, 10)
-			for topicName, _ := range topics.TopicMap {
+			for topicName := range topics.TopicMap {
 				topicList = append(topicList, topicName)
 			}
 			r.JSON(200, map[string]interface{}{"topics": topicList})
@@ -267,7 +276,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 
 		m.Get("/queues", func(r render.Render, params martini.Params) {
 			queueList := make([]string, 0, 10)
-			for queueName, _ := range queues.QueueMap {
+			for queueName := range queues.QueueMap {
 				queueList = append(queueList, queueName)
 			}
 			r.JSON(200, map[string]interface{}{"queues": queueList})
@@ -279,11 +288,11 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 			_, present = queues.QueueMap[params["queue"]]
 			if present == true {
 				queueReturn := make(map[string]interface{})
-				queueReturn["visibility_timeout"], _ = cfg.GetVisibilityTimeout(params["queue"])
-				queueReturn["min_partitions"], _ = cfg.GetMinPartitions(params["queue"])
-				queueReturn["max_partitions"], _ = cfg.GetMaxPartitions(params["queue"])
-				queueReturn["max_partition_age"], _ = cfg.GetMaxPartitionAge(params["queue"])
-				queueReturn["compressed_messages"], _ = cfg.GetCompressedMessages(params["queue"])
+				queueReturn["VisibilityTimeout"], _ = cfg.GetVisibilityTimeout(params["queue"])
+				queueReturn["MinPartitions"], _ = cfg.GetMinPartitions(params["queue"])
+				queueReturn["MaxPartitions"], _ = cfg.GetMinPartitions(params["queue"])
+				queueReturn["MaxPartitionAge"], _ = cfg.GetMaxPartitionAge(params["queue"])
+				queueReturn["CompressedMessages"], _ = cfg.GetCompressedMessages(params["queue"])
 				queueReturn["partitions"] = queues.QueueMap[params["queue"]].Parts.PartitionCount()
 				r.JSON(200, queueReturn)
 			} else {
@@ -321,7 +330,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				}
 				messages, err := queues.QueueMap[params["queue"]].Get(cfg, list, batchSize)
 
-				if err != nil && err.Error() != NOPARTITIONS {
+				if err != nil && err.Error() != NoPartitions {
 					// We're choosing to ignore nopartitions issues for now and treat them as normal 200s
 					// The only other error this could be is a riak related error but we're not going to
 					// change the API at this point. Will review this during a future release
@@ -336,7 +345,7 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 					message["body"] = string(object.Data[:])
 					messageList = append(messageList, message)
 				}
-				if err != nil && err.Error() != NOPARTITIONS {
+				if err != nil && err.Error() != NoPartitions {
 					logrus.Error(err)
 					r.JSON(500, err.Error())
 				} else {
@@ -359,10 +368,9 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 				uuid := queues.QueueMap[params["queue"]].Put(cfg, buf.String())
 
 				return uuid
-			} else {
-				// What is a sane response to this?
-				return ""
 			}
+			// V2 TODO - proper response code
+			return ""
 		})
 
 		m.Delete("/queues/:queue/message/:messageId", func(r render.Render, params martini.Params) {
@@ -389,5 +397,5 @@ func (h HTTP_API_V1) InitWebserver(list *memberlist.Memberlist, cfg *Config) {
 		})
 		// DATA INTERACTION API BLOCK
 	})
-	logrus.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HttpPort), m))
+	logrus.Fatal(http.ListenAndServe(":"+strconv.Itoa(cfg.Core.HTTPPort), m))
 }

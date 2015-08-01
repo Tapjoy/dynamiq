@@ -2,29 +2,34 @@ package app
 
 import (
 	"errors"
-	"github.com/Sirupsen/logrus"
-	"github.com/Tapjoy/lane"
-	"github.com/hashicorp/memberlist"
 	"math"
 	"math/rand"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/Tapjoy/lane"
+	"github.com/hashicorp/memberlist"
 )
 
-const NOPARTITIONS string = "no available partitions"
+// NoPartitions represents the message that there were no available partitions
+const NoPartitions string = "no available partitions"
 
+// Partitions represents a collecton of Partition objects
 type Partitions struct {
 	partitions     *lane.PQueue
 	partitionCount int
 	sync.RWMutex
 }
 
+// Partition represents the logical boundary around subsets of the overall keyspace
 type Partition struct {
-	Id       int
+	ID       int
 	LastUsed time.Time
 }
 
+// InitPartitions creates a series of partitions based on the provided config and queue
 func InitPartitions(cfg *Config, queueName string) *Partitions {
 	part := &Partitions{
 		partitions:     lane.NewPQueue(lane.MINPQ),
@@ -38,10 +43,12 @@ func InitPartitions(cfg *Config, queueName string) *Partitions {
 	return part
 }
 
+// PartitionCount returns the count of known partitions
 func (part *Partitions) PartitionCount() int {
 	return part.partitionCount
 }
 
+// GetNodePartitionRange returns the range of partitions active for this node
 func GetNodePartitionRange(cfg *Config, list *memberlist.Memberlist) (int, int) {
 	//get the node position and the node count
 	nodePosition, nodeCount := getNodePosition(list)
@@ -53,18 +60,19 @@ func GetNodePartitionRange(cfg *Config, list *memberlist.Memberlist) (int, int) 
 	return nodeBottom, nodeTop
 }
 
+// GetPartition pops a partition off of the queue for the specified queue
 func (part *Partitions) GetPartition(cfg *Config, queueName string, list *memberlist.Memberlist) (int, int, *Partition, error) {
 	//get the top and bottom for this node
 	nodeBottom, nodeTop := GetNodePartitionRange(cfg, list)
 
 	myPartition, partition, totalPartitions, err := part.getPartitionPosition(cfg, queueName)
-	if err != nil && err.Error() != NOPARTITIONS {
+	if err != nil && err.Error() != NoPartitions {
 		logrus.Error(err)
 	}
 
 	// calculate my range for the given number
-	node_range := nodeTop - nodeBottom
-	nodeStep := node_range / totalPartitions
+	nodeRange := nodeTop - nodeBottom
+	nodeStep := nodeRange / totalPartitions
 	partitionBottom := nodeStep*myPartition + nodeBottom
 	partitionTop := nodeStep*(myPartition+1) + nodeBottom
 	return partitionBottom, partitionTop, partition, err
@@ -101,27 +109,29 @@ func (part *Partitions) getPartitionPosition(cfg *Config, queueName string) (int
 		workingPartition = poppedPartition.(*Partition)
 	} else {
 		// this seems a little scary
-		return myPartition, workingPartition, part.partitionCount, errors.New(NOPARTITIONS)
+		return myPartition, workingPartition, part.partitionCount, errors.New(NoPartitions)
 	}
 	visTimeout, _ := cfg.GetVisibilityTimeout(queueName)
 	if time.Since(workingPartition.LastUsed).Seconds() > visTimeout {
-		myPartition = workingPartition.Id
+		myPartition = workingPartition.ID
 	} else {
 		part.partitions.Push(workingPartition, workingPartition.LastUsed.UnixNano())
 		part.Lock()
 		defer part.Unlock()
-		maxPartitions, _ := cfg.GetMaxPartitions(queueName)
-		if part.partitionCount < maxPartitions {
+		MinPartitions, _ := cfg.GetMinPartitions(queueName)
+		if part.partitionCount < MinPartitions {
 			workingPartition = new(Partition)
-			workingPartition.Id = part.partitionCount
-			myPartition = workingPartition.Id
+			workingPartition.ID = part.partitionCount
+			myPartition = workingPartition.ID
 			part.partitionCount = part.partitionCount + 1
 		} else {
-			err = errors.New(NOPARTITIONS)
+			err = errors.New(NoPartitions)
 		}
 	}
 	return myPartition, workingPartition, part.partitionCount, err
 }
+
+// PushPartition pushes a partition back onto the queue for the given queue
 func (part *Partitions) PushPartition(cfg *Config, queueName string, partition *Partition, lock bool) {
 	if lock {
 		partition.LastUsed = time.Now()
@@ -136,12 +146,12 @@ func (part *Partitions) PushPartition(cfg *Config, queueName string, partition *
 
 func (part *Partitions) makePartitions(cfg *Config, queueName string, partitionsToMake int) {
 	var initialTime time.Time
-	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
+	MinPartitions, _ := cfg.GetMinPartitions(queueName)
 	offset := part.partitionCount
-	for partitionId := offset; partitionId < offset+partitionsToMake; partitionId++ {
-		if maxPartitions > partitionId {
+	for partitionID := offset; partitionID < offset+partitionsToMake; partitionID++ {
+		if MinPartitions > partitionID {
 			partition := new(Partition)
-			partition.Id = partitionId
+			partition.ID = partitionID
 			partition.LastUsed = initialTime
 			part.partitions.Push(partition, rand.Int63n(100000))
 			part.partitionCount = part.partitionCount + 1
@@ -151,12 +161,12 @@ func (part *Partitions) makePartitions(cfg *Config, queueName string, partitions
 func (part *Partitions) syncPartitions(cfg *Config, queueName string) {
 
 	part.Lock()
-	maxPartitions, _ := cfg.GetMaxPartitions(queueName)
+	MinPartitions, _ := cfg.GetMinPartitions(queueName)
 	minPartitions, _ := cfg.GetMinPartitions(queueName)
 	maxPartitionAge, _ := cfg.GetMaxPartitionAge(queueName)
 
 	var partsRemoved int
-	for partsRemoved = 0; maxPartitions < part.partitionCount; partsRemoved++ {
+	for partsRemoved = 0; MinPartitions < part.partitionCount; partsRemoved++ {
 		_, _ = part.partitions.Pop()
 	}
 	part.partitionCount = part.partitionCount - partsRemoved

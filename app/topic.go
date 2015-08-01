@@ -2,12 +2,14 @@ package app
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/tpjg/goriakpbc"
 	"sync"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/tpjg/goriakpbc"
 )
 
+// Topic represents a topic
 type Topic struct {
 	// store a CRDT in riak for the topic configuration including subscribers
 	Name     string
@@ -18,6 +20,7 @@ type Topic struct {
 	sync.RWMutex
 }
 
+// Topics represents a collection of topics
 type Topics struct {
 	// global topic configuration, should contain list of all active topics
 	Config *riak.RDtMap
@@ -32,7 +35,8 @@ type Topics struct {
 	sync.RWMutex
 }
 
-func InitTopics(cfg *Config, queues *Queues) Topics {
+// InitTopics initializes the set of known topics in the system
+func InitTopics(cfg *Config, queues *Queues) *Topics {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("maps", "config")
 	if err != nil {
@@ -59,9 +63,10 @@ func InitTopics(cfg *Config, queues *Queues) Topics {
 		TopicMap: make(map[string]*Topic),
 	}
 	go topics.scheduleSync(cfg)
-	return topics
+	return &topics
 }
 
+// InitTopic initializes an individual topic given a known name
 func (topics *Topics) InitTopic(name string) {
 	// TODO refactor the behavior of this method into 2 methods, as described below
 	// Currently, this is used for 2 related but different purposes:
@@ -70,7 +75,7 @@ func (topics *Topics) InitTopic(name string) {
 	// We should split the use cases so we don't do excess calls to Riak when booting up
 	// to re-save the topic config and topics config. As-is, there is no detriment to the save calls, it's just wasted time
 	client := topics.riakPool
-	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, _ := client.NewBucketType("maps", ConfigurationBucket)
 	config, _ := bucket.FetchMap(topicConfigRecordName(name))
 
 	topic := new(Topic)
@@ -87,10 +92,9 @@ func (topics *Topics) InitTopic(name string) {
 	// Add the queue to the riak store
 	topics.Config.FetchSet("topics").Add([]byte(name))
 	topics.Config.Store()
-
 }
 
-//Broadcast the message to all listening queues and return the acked writes
+// Broadcast will send the message to all listening queues and return the acked writes
 func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 	queueWrites := make(map[string]string)
 	// If we haven't mapped any queues to this topic yet, this will be nil
@@ -112,10 +116,11 @@ func (topic *Topic) Broadcast(cfg *Config, message string) map[string]string {
 	return queueWrites
 }
 
+// AddQueue adds a new queue as a subscriber to the topic
 func (topic *Topic) AddQueue(cfg *Config, name string) {
 	client := cfg.RiakConnection()
 
-	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, err := client.NewBucketType("maps", ConfigurationBucket)
 	recordName := topicConfigRecordName(topic.Name)
 	topic.Config, err = bucket.FetchMap(recordName)
 
@@ -128,10 +133,11 @@ func (topic *Topic) AddQueue(cfg *Config, name string) {
 	}
 }
 
+// DeleteQueue will remove a queue from the list of topic subscribers
 func (topic *Topic) DeleteQueue(cfg *Config, name string) {
 	client := cfg.RiakConnection()
 	recordName := topicConfigRecordName(topic.Name)
-	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, _ := client.NewBucketType("maps", ConfigurationBucket)
 	topic.Config, _ = bucket.FetchMap(recordName)
 
 	topic.Config.FetchSet("queues").Remove([]byte(name))
@@ -142,6 +148,7 @@ func (topic *Topic) DeleteQueue(cfg *Config, name string) {
 
 }
 
+// ListQueues will return a list of all known queues for a topic
 func (topic *Topic) ListQueues() []string {
 	list := make([]string, 0, 10)
 	queueList := topic.Config.FetchSet("queues")
@@ -153,6 +160,8 @@ func (topic *Topic) ListQueues() []string {
 	return list
 }
 
+// DeleteTopic will delete the topic from the collection of all topics, which
+// removes any queues it's subscription list
 func (topics *Topics) DeleteTopic(cfg *Config, name string) bool {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("maps", "config")
@@ -174,11 +183,12 @@ func (topics *Topics) DeleteTopic(cfg *Config, name string) bool {
 	if err != nil {
 		logrus.Error(err)
 		return false
-	} else {
-		return true
 	}
+	return true
 }
 
+// Delete will delete the given topic, which removes any queues from its subscription
+// list
 func (topic *Topic) Delete(cfg *Config) {
 	client := cfg.RiakConnection()
 
@@ -218,7 +228,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 	logrus.Debug("syncing Topic config with Riak")
 	//refresh the topic RDtMap
 	client := cfg.RiakConnection()
-	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, err := client.NewBucketType("maps", ConfigurationBucket)
 	if err != nil {
 		// This is likely caused by a network blip against the riak node, or the node being down
 		// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
@@ -267,7 +277,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 
 	}
 	//iterate over the topics in topics.TopicMap and delete the ones no longer used
-	for topic, _ := range topics.TopicMap {
+	for topic := range topics.TopicMap {
 		var present bool
 		_, present = topicsToKeep[topic]
 		if present != true {
@@ -284,7 +294,7 @@ func (topics *Topics) syncConfig(cfg *Config) {
 func (topic *Topic) syncConfig() {
 	//refresh the topic RDtMap
 	client := topic.riakPool
-	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, err := client.NewBucketType("maps", ConfigurationBucket)
 	if err != nil {
 		logrus.Error(err)
 	}

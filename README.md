@@ -294,11 +294,11 @@ Golang is very particular about its data types, specifically parsing them from J
 
 ```json
 {
-  "visibility_timeout" : 2,
-  "max_partitions" : 10,
-  "min_partitions" : 1,
-  "max_partition_age" : 426000,
-  "compressed_messages" : false
+  "VisibilityTimeout" : 2,
+  "MaxPartitions" : 10,
+  "MinPartitions" : 1,
+  "MaxPartitionAge" : 426000,
+  "CompressedMessages" : false
 }
 ```
 

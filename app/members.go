@@ -1,12 +1,15 @@
 package app
 
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/hashicorp/memberlist"
 	"sort"
 	"strconv"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/hashicorp/memberlist"
 )
 
+// InitMemberList created a memberlist, and joins it to the network
+// TODO clean this up, since we only really need the 1 port
 func InitMemberList(name string, port int, seedServers []string, seedPort int) (*memberlist.Memberlist, int, error) {
 	conf := memberlist.DefaultLANConfig()
 	conf.Name = name

@@ -11,8 +11,8 @@ var _ = Describe("Partition", func() {
 	var (
 		partitions        *app.Partitions
 		err               error
-		partitionTopId    int
-		partitionBottomId int
+		partitionTopID    int
+		partitionBottomID int
 		partition         *app.Partition
 	)
 
@@ -31,15 +31,15 @@ var _ = Describe("Partition", func() {
 	Context("GetPartition", func() {
 		BeforeEach(func() {
 			// Get the partition ids, and any errors
-			partitionBottomId, partitionTopId, partition, err = partitions.GetPartition(cfg, testQueueName, memberList)
+			partitionBottomID, partitionTopID, partition, err = partitions.GetPartition(cfg, testQueueName, memberList)
 		})
 
 		It("should get a partitionTopId", func() {
-			Expect(partitionTopId).ToNot(BeNil())
+			Expect(partitionTopID).ToNot(BeNil())
 		})
 
 		It("should get a partitionBottomId", func() {
-			Expect(partitionBottomId).ToNot(BeNil())
+			Expect(partitionBottomID).ToNot(BeNil())
 		})
 
 		It("should not get an error", func() {
