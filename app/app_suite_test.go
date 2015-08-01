@@ -51,9 +51,9 @@ var _ = BeforeSuite(func() {
 		ToRemove: make([]*pb.MapField, 1),
 	}
 
-	configRDtMap.Values[riak.MapKey{Key: "MaxPartitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.MaxPartitions])}
-	configRDtMap.Values[riak.MapKey{Key: "MinPartitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.MinPartitions])}
-	configRDtMap.Values[riak.MapKey{Key: "VisibilityTimeout", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.VisibilityTimeout])}
+	configRDtMap.Values[riak.MapKey{Key: "max_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.MaxPartitions])}
+	configRDtMap.Values[riak.MapKey{Key: "min_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.MinPartitions])}
+	configRDtMap.Values[riak.MapKey{Key: "visibility_timeout", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.VisibilityTimeout])}
 
 	queue := &app.Queue{
 		Name:   testQueueName,

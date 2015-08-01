@@ -26,11 +26,11 @@ import (
 
 // ConfigRequest is
 type ConfigRequest struct {
-	VisibilityTimeout  *float64 `json:"VisibilityTimeout,omitempty"`
-	MinPartitions      *int     `json:"MinPartitions,omitempty"`
-	MaxPartitions      *int     `json:"MaxPartitions,omitempty"`
-	MaxPartitionAge    *float64 `json:"MaxPartitionAge,omitempty"`
-	CompressedMessages *bool    `json:"CompressedMessages,omitempty"`
+	VisibilityTimeout  *float64 `json:"visibility_timeout,omitempty"`
+	MinPartitions      *int     `json:"min_partitions,omitempty"`
+	MaxPartitions      *int     `json:"max_partitions,omitempty"`
+	MaxPartitionAge    *float64 `json:"max_partition_age,omitempty"`
+	CompressedMessages *bool    `json:"compressed_messages,omitempty"`
 }
 
 // TODO make message definitions more explicit

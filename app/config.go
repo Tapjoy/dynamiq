@@ -31,22 +31,22 @@ const QueueConfigName = "queue_config"
 const QueueSetName = "queues"
 
 // VisibilityTimeout is the name of the config setting name for controlling how long a message is "inflight"
-const VisibilityTimeout = "VisibilityTimeout"
+const VisibilityTimeout = "visibility_timeout"
 
-// PartitionCount is the name of the config setting name for controlling how many partitions are created per node
-const PartitionCount = "PartitionCount"
+// PartitionCount is
+const PartitionCount = "partition_count"
 
-// MinPartitions is
-const MinPartitions = "MinPartitions"
+// MinPartitions is the name of the config setting name for controlling the minimum number of partitions per queue
+const MinPartitions = "min_partitions"
 
-// MaxPartitions is
-const MaxPartitions = "MaxPartitions"
+// MaxPartitions is the name of the config setting name for controlling the maximum number of partitions per node
+const MaxPartitions = "max_partitions"
 
-// MaxPartitionAge is
-const MaxPartitionAge = "MaxPartitionAge"
+// MaxPartitionAge is the name of the config setting name for controlling how long an un-used partition should exist
+const MaxPartitionAge = "max_partition_age"
 
-// CompressedMessages is
-const CompressedMessages = "CompressedMessages"
+// CompressedMessages is the name of the config setting name for controlling if the queue is using compression or not
+const CompressedMessages = "compressed_messages"
 
 // Settings Arrays and maps cannot be made immutable in golang
 var Settings = [...]string{VisibilityTimeout, PartitionCount, MinPartitions, MaxPartitions, MaxPartitionAge, CompressedMessages}

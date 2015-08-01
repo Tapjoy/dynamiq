@@ -8,20 +8,20 @@ Disclaimer
 
 Dynamiq is currently in use in production at Tapjoy. However, the product is still considered to be a beta offering, which comes with no guarantees around the interfaces or behaviors provided in whatever the "current" version is.
 
-We encourage interested parties to use Dynamiq, understanding that prior to an official v1 release, things could change. 
+We encourage interested parties to use Dynamiq, understanding that prior to an official v1 release, things could change.
 
 Caveat Emptor
 
 What is Dynamiq?
 ==========
 
-Dynamiq is a distributed databag, acting as a queue. It's written in golang, and run in a cluster on top of Riak 2.0. 
+Dynamiq is a distributed databag, acting as a queue. It's written in golang, and run in a cluster on top of Riak 2.0.
 
 It exposes a simple REST API for publishing to topics and directly enqueueing to queues, as well as receiving batches of messages at a time.
 
 Dynamiq acts as both a simple queueing application, as well as a topic-fanout system. Simply, you can create topics and queues, subscribe queues to topics, and publish messages either to topics (which will fan out to all of their queues) or to queues directly (which will only enqueue to that specific queue).
 
-It provides at-least once delivery semantics, which are governed by "partitions" - slices of the overall total range of all possible keys, broken up by the number of nodes in the cluster, each node holding the configured number of partitions for that queue. 
+It provides at-least once delivery semantics, which are governed by "partitions" - slices of the overall total range of all possible keys, broken up by the number of nodes in the cluster, each node holding the configured number of partitions for that queue.
 
 When a batch of messages are received from Dynamiq, the partition they came from is considered locked-out for delivery, which will expire once the Visibility Timeout on that queue expires. When that timeout expires, any un-acknowledged messages are available to be served again.
 
@@ -44,9 +44,9 @@ Getting Started
 
 Prerequisites
 -------------
-To get Dynamiq up and running, you need to have a few pre-requisites installed. 
+To get Dynamiq up and running, you need to have a few pre-requisites installed.
 
-First, you'll need golang installed. You can find the instructions [here](https://golang.org/doc/install). 
+First, you'll need golang installed. You can find the instructions [here](https://golang.org/doc/install).
 
 If you've never worked with golang before, you should take some time to familiarize yourself with how go expects to work from a development standpoint, with regard to the GOROOT / GOPATH environment variables and where your go code is actually located on disk.
 
@@ -58,9 +58,9 @@ go get github.com/Tapjoy/dynamiq
 
 Third, you need an installation of Riak 2.0 up and running somewhere (preferably local, for testing / development). You can find guides on how to install Riak 2.0 for your particular operating system [here](http://docs.basho.com/riak/latest/quickstart/)
 
-Finally, you need to create and enable certain bucket types in Riak 2.0. This is taken care of for you in the setup.sh script provided by Dynamiq. 
+Finally, you need to create and enable certain bucket types in Riak 2.0. This is taken care of for you in the setup.sh script provided by Dynamiq.
 
-``` 
+```
 sh ./setup.sh
 ```
 
@@ -124,9 +124,9 @@ Dynamiq natively provides no security, authentication, or authorization services
 REST API
 ============
 
-Dynamiq supports a REST API for communicating between clients and Dynamiq. The current API (v1) is not perfectly RESTful in its nature, due to it's evolving naturally and quickly during the initial development of Dynamiq. Some endpoints return a simple string, others return a JSON object. 
+Dynamiq supports a REST API for communicating between clients and Dynamiq. The current API (v1) is not perfectly RESTful in its nature, due to it's evolving naturally and quickly during the initial development of Dynamiq. Some endpoints return a simple string, others return a JSON object.
 
-It can, however, be considered "Stable", in that we will only continue to add new routes which behave like old ones, and will not modify or remove existing v1 routes or behaviors. 
+It can, however, be considered "Stable", in that we will only continue to add new routes which behave like old ones, and will not modify or remove existing v1 routes or behaviors.
 
 An overhauled v2 of this API, containing more RESTful routes and a consistent response object is planned.
 
@@ -153,7 +153,7 @@ An overhauled v2 of this API, containing more RESTful routes and a consistent re
 --------------------
 
 * Response Code: 422
-* Response: a JSON object containing the error "Topic already exists." 
+* Response: a JSON object containing the error "Topic already exists."
 * Result: The topic already existed, was not modified
 
 ### DELETE /topics/:topic_name
@@ -195,7 +195,7 @@ An overhauled v2 of this API, containing more RESTful routes and a consistent re
 ------------------------
 
 * Response Code: 422
-* Response: a JSON object containing the error "Queue already exists." 
+* Response: a JSON object containing the error "Queue already exists."
 * Result: The queue already existed, was not modified
 
 ### DELETE /queue/:queue_name
@@ -258,7 +258,7 @@ An overhauled v2 of this API, containing more RESTful routes and a consistent re
 
 A note about deletes:
 
-Because it is possible to try to delete a message which was already deleted, we do not throw any errors on an incorrect ID. 
+Because it is possible to try to delete a message which was already deleted, we do not throw any errors on an incorrect ID.
 
 * Response Code: 200
 * Response: true or false, depending on the existence of the message to be deleted
@@ -294,11 +294,11 @@ Golang is very particular about its data types, specifically parsing them from J
 
 ```json
 {
-  "VisibilityTimeout" : 2,
-  "MaxPartitions" : 10,
-  "MinPartitions" : 1,
-  "MaxPartitionAge" : 426000,
-  "CompressedMessages" : false
+  "visibility_timeout" : 2,
+  "max_partitions" : 10,
+  "min_partitions" : 1,
+  "max_partition_age" : 426000,
+  "compressed_messages" : false
 }
 ```
 
@@ -373,7 +373,7 @@ Internally, Dynamiq assigns an id to each message it receives. Using this id as 
 
 Given my number of nodes N, the upperbound of my keyspace K (which is the maximum value of an int64, or roughly 9.223 X 10^18), each individual node is responsible for a theoretical maximum of K / N messages.
 
-Let's say I'm Node N of 5. We're responsible for roughly 1.8 X 10^18 messages total (per queue), of which I am aware of the lower and upper bound of my range of the keyspace (LB and UB, respectively). 
+Let's say I'm Node N of 5. We're responsible for roughly 1.8 X 10^18 messages total (per queue), of which I am aware of the lower and upper bound of my range of the keyspace (LB and UB, respectively).
 
 From here, I'm able to serve any of those messages. Each of the queues that I'm holding has a configured number of Partitions, globally.
 
@@ -385,7 +385,7 @@ Partitions will be served to clients such that Partitions which have not recentl
 
 Implementation Details
 =========
-This is a simple proof of concept demonstrating the effectiveness of implementing a 
+This is a simple proof of concept demonstrating the effectiveness of implementing a
 Dynamiq is a distributed data bag implementation on top of Riak, which anchors on the following properties:
 
 1. Provides a distributed key-value store to support fast put/enqueue times ( put will be limited by the speed of the underlying storage ).
@@ -432,18 +432,18 @@ Implementation
 ==========
 Currently this implementation uses riak and properties 1 & 2 from above, with the following heuristic:
 
-PUT) 
+PUT)
 
   1. Generate a uuid for the message
   2. Put the object into riak with a 2i index on the uuid
   3. Serve the uuid of the object back to the client
 
 GET)
-  
+
   1. Return the least recently used, unlocked partition for the requested queue
   2. 2i query for X messages in the bucket, where X is your provided batch size, within the range of the retrieved partition
   3. Serve the messages
-  
+
 DELETE)
 
   1. Delete the message matching the inbound uuid
