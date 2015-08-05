@@ -6,7 +6,7 @@
  httpport=8081
  riaknodes="127.0.0.1:8087"
  backendconnectionpool=128
- syncconfiginterval=1000
+ syncconfiginterval=30000 # 30 seconds by default
  loglevelstring=debug # understandable by logrus.ParseLevel
 [stats]
  type=statsd #(statsd|none)
