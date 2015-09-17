@@ -3,28 +3,42 @@ package app
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/Tapjoy/dynamiq/app/stats"
-	"github.com/hashicorp/memberlist"
-	"github.com/tpjg/goriakpbc"
 	"math"
 	"math/big"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/Tapjoy/dynamiq/app/stats"
+	"github.com/hashicorp/memberlist"
+	"github.com/tpjg/goriakpbc"
 )
 
 // Define statistics keys suffixes
 
-const QUEUE_SENT_STATS_SUFFIX = "sent.count"
-const QUEUE_RECEIVED_STATS_SUFFIX = "received.count"
-const QUEUE_DELETED_STATS_SUFFIX = "deleted.count"
-const QUEUE_DEPTH_STATS_SUFFIX = "depth.count"
-const QUEUE_DEPTHAPR_STATS_SUFFIX = "approximate_depth.count"
-const QUEUE_FILLDELTA_STATS_SUFFIX = "fill.count"
+// QueueSentStatsSuffix is
+const QueueSentStatsSuffix = "sent.count"
 
-var MAX_ID_SIZE = *big.NewInt(math.MaxInt64)
+// QueueReceivedStatsSuffix is
+const QueueReceivedStatsSuffix = "received.count"
 
+// QueueDeletedStatsSuffix is
+const QueueDeletedStatsSuffix = "deleted.count"
+
+// QueueDepthStatsSuffix is
+const QueueDepthStatsSuffix = "depth.count"
+
+// QueueDepthAprStatsSuffix is
+const QueueDepthAprStatsSuffix = "approximate_depth.count"
+
+// QueueFillDeltaStatsSuffix
+const QueueFillDeltaStatsSuffix = "fill.count"
+
+// MaxIDSize is
+var MaxIDSize = *big.NewInt(math.MaxInt64)
+
+// Queues represents
 type Queues struct {
 	// a container for all queues
 	QueueMap map[string]*Queue
@@ -37,6 +51,7 @@ type Queues struct {
 	syncKiller    chan struct{}
 }
 
+// Queue represents
 type Queue struct {
 	// the definition of a queue
 	// name of the queue
@@ -49,70 +64,70 @@ type Queue struct {
 	sync.RWMutex
 }
 
-func recordFillRatio(c stats.StatsClient, queueName string, batchSize int64, messageCount int64) error {
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_FILLDELTA_STATS_SUFFIX)
+func recordFillRatio(c stats.Client, queueName string, batchSize int64, messageCount int64) error {
+	key := fmt.Sprintf("%s.%s", queueName, QueueFillDeltaStatsSuffix)
 	// We need the division to use floats as go does not supporting int/int returning an int
 	// Multiply by 100 to return a whole number, round down because we don't care about that much precision
 	rate := int64(math.Floor((float64(messageCount) / float64(batchSize)) * 100))
 	return c.SetGauge(key, rate)
 }
 
-func incrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
+func incrementMessageCount(c stats.Client, queueName string, numberOfMessages int64) error {
 	// Increment # Sent
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_SENT_STATS_SUFFIX)
+	key := fmt.Sprintf("%s.%s", queueName, QueueSentStatsSuffix)
 	err := c.Incr(key, numberOfMessages)
 	// Increment Depth count
-	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
+	key = fmt.Sprintf("%s.%s", queueName, QueueDepthStatsSuffix)
 	err = c.IncrGauge(key, numberOfMessages)
 	return err
 }
 
-func decrementMessageCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
+func decrementMessageCount(c stats.Client, queueName string, numberOfMessages int64) error {
 	// Increment # Deleted
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DELETED_STATS_SUFFIX)
+	key := fmt.Sprintf("%s.%s", queueName, QueueDeletedStatsSuffix)
 	err := c.Incr(key, numberOfMessages)
 	// Decrement Depth count
-	key = fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTH_STATS_SUFFIX)
+	key = fmt.Sprintf("%s.%s", queueName, QueueDepthStatsSuffix)
 	err = c.DecrGauge(key, numberOfMessages)
 	return err
 }
 
-func incrementReceiveCount(c stats.StatsClient, queueName string, numberOfMessages int64) error {
+func incrementReceiveCount(c stats.Client, queueName string, numberOfMessages int64) error {
 	// Increment # Received
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_RECEIVED_STATS_SUFFIX)
+	key := fmt.Sprintf("%s.%s", queueName, QueueReceivedStatsSuffix)
 	err := c.Incr(key, numberOfMessages)
 	return err
 }
-func (queue *Queue) setQueueDepthApr(c stats.StatsClient, list *memberlist.Memberlist, queueName string, ids []string) error {
+func (queue *Queue) setQueueDepthApr(c stats.Client, list *memberlist.Memberlist, queueName string, ids []string) error {
 	// set  depth
-	key := fmt.Sprintf("%s.%s", queueName, QUEUE_DEPTHAPR_STATS_SUFFIX)
+	key := fmt.Sprintf("%s.%s", queueName, QueueDepthAprStatsSuffix)
 	// find the difference between the first messages id and the last messages id
 
 	if len(ids) > 1 {
 		first, _ := strconv.ParseInt(ids[0], 10, 64)
 		last, _ := strconv.ParseInt(ids[len(ids)-1], 10, 64)
 		difference := last - first
-		//find the density of messages
+		// find the density of messages
 		density := float64(len(ids)) / float64(difference)
 		// find the total count of messages by multiplying the density by the key range
 		count := density * math.MaxInt64
 		return c.SetGauge(key, int64(count))
 
-	} else {
-		// for small queues where we only return 1  message or no messages guesstimate ( or should we return 0? )
-		multiplier := queue.Parts.PartitionCount() * len(list.Members())
-		return c.SetGauge(key, int64(len(ids)*multiplier))
 	}
+	// for small queues where we only return 1 message or no messages guesstimate ( or should we return 0? )
+	multiplier := queue.Parts.PartitionCount() * len(list.Members())
+	return c.SetGauge(key, int64(len(ids)*multiplier))
 }
 
+// Exists checks is the given queue name is already created or not
 func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	// For now, lets go right to Riak for this
 	// Because of the config delay, we don't wanna check the memory values
 	client := cfg.RiakConnection()
 
-	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-	m, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
-	set := m.AddSet(QUEUE_SET_NAME)
+	bucket, _ := client.NewBucketType("maps", ConfigurationBucket)
+	m, _ := bucket.FetchMap(QueueConfigName)
+	set := m.AddSet(QueueSetName)
 
 	for _, value := range set.GetValue() {
 		logrus.Debug("Looking for %s, found %s", queueName, string(value[:]))
@@ -123,11 +138,12 @@ func (queues *Queues) Exists(cfg *Config, queueName string) bool {
 	return false
 }
 
-func (queues Queues) DeleteQueue(name string, cfg *Config) bool {
+// DeleteQueue deletes the given queue
+func (queues *Queues) DeleteQueue(name string, cfg *Config) bool {
 	client := cfg.RiakConnection()
 
-	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
-	config, _ := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	bucket, _ := client.NewBucketType("maps", ConfigurationBucket)
+	config, _ := bucket.FetchMap(QueueConfigName)
 	config.FetchSet("queues").Remove([]byte(name))
 	config.Store()
 
@@ -138,7 +154,7 @@ func (queues Queues) DeleteQueue(name string, cfg *Config) bool {
 	return !queues.Exists(cfg, name)
 }
 
-// get a message from the queue
+// Get gets a message from the queue
 func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int64) ([]riak.RObject, error) {
 	// grab a riak client
 	client := cfg.RiakConnection()
@@ -178,7 +194,7 @@ func (queue *Queue) Get(cfg *Config, list *memberlist.Memberlist, batchsize int6
 	return queue.RetrieveMessages(messageIds, cfg), err
 }
 
-// Put a Message onto the queue
+// Put puts a Message onto the queue
 func (queue *Queue) Put(cfg *Config, message string) string {
 	//Grab our bucket
 	client := cfg.RiakConnection()
@@ -199,7 +215,7 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 		}
 
 		//Retrieve a UUID
-		randy, _ := rand.Int(rand.Reader, &MAX_ID_SIZE)
+		randy, _ := rand.Int(rand.Reader, &MaxIDSize)
 		uuid := randy.String()
 
 		messageObj := bucket.NewObject(uuid)
@@ -211,13 +227,12 @@ func (queue *Queue) Put(cfg *Config, message string) string {
 
 		defer incrementMessageCount(cfg.Stats.Client, queue.Name, 1)
 		return uuid
-	} else {
-		//Actually want to handle this in some other way
-		return ""
 	}
+	//Actually want to handle this in some other way
+	return ""
 }
 
-// Delete a Message from the queue
+// Delete deletes a Message from the queue
 func (queue *Queue) Delete(cfg *Config, id string) bool {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("messages", queue.Name)
@@ -226,17 +241,16 @@ func (queue *Queue) Delete(cfg *Config, id string) bool {
 		if err == nil {
 			defer decrementMessageCount(cfg.Stats.Client, queue.Name, 1)
 			return true
-		} else {
-			logrus.Error(err)
 		}
-	} else {
-		logrus.Error(err)
 	}
+
 	// if we got here we're borked
 	// TODO stats cleanup? Possibility that this gets us out of sync
+	logrus.Error(err)
 	return false
 }
 
+// BatchDelete deletes multiple messages at once
 func (queue *Queue) BatchDelete(cfg *Config, ids []string) (int, error) {
 	client := cfg.RiakConnection()
 	bucket, err := client.NewBucketType("messages", queue.Name)
@@ -246,7 +260,7 @@ func (queue *Queue) BatchDelete(cfg *Config, ids []string) (int, error) {
 			err = bucket.Delete(id)
 			if err != nil {
 				logrus.Error(err)
-				errors += 1
+				errors++
 			}
 		}
 		// Don't count deletes that failed
@@ -259,7 +273,7 @@ func (queue *Queue) BatchDelete(cfg *Config, ids []string) (int, error) {
 	return errors, err
 }
 
-// helpers
+// RetrieveMessages takes a list of message ids and pulls the actual data from Riak
 func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 	var rObjectArrayChan = make(chan riak.RObject, len(ids))
 	var rKeys = make(chan string, len(ids))
@@ -332,7 +346,7 @@ func (queue *Queue) RetrieveMessages(ids []string, cfg *Config) []riak.RObject {
 func (queues *Queues) syncConfig(cfg *Config) {
 	logrus.Debug("syncing Queue config with Riak")
 	client := cfg.RiakConnection()
-	bucket, err := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, err := client.NewBucketType("maps", ConfigurationBucket)
 	if err != nil {
 		// This is likely caused by a network blip against the riak node, or the node being down
 		// In lieu of hard-failing the service, which can recover once riak comes back, we'll simply
@@ -342,7 +356,7 @@ func (queues *Queues) syncConfig(cfg *Config) {
 		return
 	}
 
-	queuesConfig, err := bucket.FetchMap(QUEUE_CONFIG_NAME)
+	queuesConfig, err := bucket.FetchMap(QueueConfigName)
 	if err != nil {
 		if err.Error() == "Object not found" {
 			// This means there are no queues yet
@@ -359,7 +373,7 @@ func (queues *Queues) syncConfig(cfg *Config) {
 	queues.updateConfig(queuesConfig)
 
 	//iterate the map and add or remove topics that need to be destroyed
-	queueSet := queues.getConfig().AddSet(QUEUE_SET_NAME)
+	queueSet := queues.getConfig().AddSet(QueueSetName)
 
 	if queueSet == nil {
 		//bail if there aren't any queues
@@ -388,11 +402,11 @@ func (queues *Queues) syncConfig(cfg *Config) {
 
 	//iterate over the topics in topics.TopicMap and delete the ones no longer used
 	topics := cfg.Topics
-	for queue, _ := range queues.QueueMap {
+	for queue := range queues.QueueMap {
 		var present bool
 		_, present = queuesToKeep[queue]
 		if present != true {
-			for topic, _ := range topics.TopicMap {
+			for topic := range topics.TopicMap {
 				topicQueueList := topics.TopicMap[topic].ListQueues()
 				for _, topicQueue := range topicQueueList {
 					if topicQueue == string(queue) {
@@ -434,7 +448,7 @@ func (queues *Queues) scheduleSync(cfg *Config) {
 func initQueueFromRiak(cfg *Config, queueName string) {
 	client := cfg.RiakConnection()
 
-	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, _ := client.NewBucketType("maps", ConfigurationBucket)
 	config, _ := bucket.FetchMap(queueConfigRecordName(queueName))
 
 	queue := Queue{
@@ -451,7 +465,7 @@ func initQueueFromRiak(cfg *Config, queueName string) {
 func (queue *Queue) syncConfig(cfg *Config) {
 	//refresh the queue RDtMap
 	client := cfg.RiakConnection()
-	bucket, _ := client.NewBucketType("maps", CONFIGURATION_BUCKET)
+	bucket, _ := client.NewBucketType("maps", ConfigurationBucket)
 
 	rCfg, _ := bucket.FetchMap(queueConfigRecordName(queue.Name))
 	queue.updateConfig(rCfg)

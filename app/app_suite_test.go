@@ -1,6 +1,10 @@
 package app_test
 
 import (
+	"io/ioutil"
+	"testing"
+	"time"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app"
 	"github.com/hashicorp/memberlist"
@@ -8,9 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/tpjg/goriakpbc"
 	"github.com/tpjg/goriakpbc/pb"
-	"io/ioutil"
-	"testing"
-	"time"
 )
 
 var cfg *app.Config
@@ -37,7 +38,7 @@ var _ = BeforeSuite(func() {
 		SeedServer:            "steve",
 		SeedServers:           []string{"steve"},
 		SeedPort:              8001,
-		HttpPort:              8003,
+		HTTPPort:              8003,
 		RiakNodes:             "127.0.0.1",
 		BackendConnectionPool: 16,
 		SyncConfigInterval:    duration,
@@ -50,9 +51,9 @@ var _ = BeforeSuite(func() {
 		ToRemove: make([]*pb.MapField, 1),
 	}
 
-	configRDtMap.Values[riak.MapKey{Key: "max_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DEFAULT_SETTINGS[app.MAX_PARTITIONS])}
-	configRDtMap.Values[riak.MapKey{Key: "min_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DEFAULT_SETTINGS[app.MIN_PARTITIONS])}
-	configRDtMap.Values[riak.MapKey{Key: "visibility_timeout", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DEFAULT_SETTINGS[app.VISIBILITY_TIMEOUT])}
+	configRDtMap.Values[riak.MapKey{Key: "max_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.MaxPartitions])}
+	configRDtMap.Values[riak.MapKey{Key: "min_partitions", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.MinPartitions])}
+	configRDtMap.Values[riak.MapKey{Key: "visibility_timeout", Type: pb.MapField_REGISTER}] = &riak.RDtRegister{Value: []byte(app.DefaultSettings[app.VisibilityTimeout])}
 
 	queue := &app.Queue{
 		Name:   testQueueName,
