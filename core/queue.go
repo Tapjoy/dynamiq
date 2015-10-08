@@ -1,8 +1,6 @@
 package core
 
 import (
-	"math"
-	"math/big"
 	"sync"
 
 	"github.com/StabbyCutyou/partition_ring"
@@ -17,7 +15,8 @@ type Queue struct {
 	Name string
 	// the PartitionRing for this queue
 	ring *partitionring.PartitionRing
-
+	// the RiakService
+	riakService *RiakService
 	// Mutex for protecting rw access to the Config object
 	configLock sync.RWMutex
 	// Individual settings for the queue
@@ -44,5 +43,29 @@ const QueueDepthAprStatsSuffix = "approximate_depth.count"
 // QueueFillDeltaStatsSuffix
 const QueueFillDeltaStatsSuffix = "fill.count"
 
-// MaxIDSize is
-var MaxIDSize = *big.NewInt(math.MaxInt64)
+// PollMessages does a range scan over the queue bucket and returns a map of message ids to bodies
+func (queue *Queue) PollMessages(batchSize uint32) (map[string]string, error) {
+	lower, upper, err := queue.ring.ReserveNext()
+	if err != nil {
+		return nil, err
+	}
+	riakObjects, err := queue.riakService.RangeScanMessages(queue.Name, batchSize, lower, upper)
+	if err != nil {
+		return nil, err
+	}
+	results := make(map[string]string, len(riakObjects))
+	for _, obj := range riakObjects {
+		results[obj.Key] = string(obj.Value)
+	}
+	return results, err
+}
+
+// DeleteMessage is
+func (queue *Queue) DeleteMessage(id string) (map[string]bool, error) {
+	return queue.DeleteMessages([]string{id})
+}
+
+// DeleteMessages is
+func (queue *Queue) DeleteMessages(ids []string) (map[string]bool, error) {
+	return queue.riakService.DeleteMessages(queue.Name, ids)
+}

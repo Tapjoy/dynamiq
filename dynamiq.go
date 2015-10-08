@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"math"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app"
@@ -16,6 +17,12 @@ func main2() {
 		log.Fatal(err)
 	}
 
+	messages, err := cfg.Riak.Service.RangeScanMessages("tq1", 20, 0, math.MaxInt64)
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println("Stuff")
+	log.Println(messages)
 	httpServer, err := httpv2.New(cfg)
 	if err != nil {
 		log.Println(err)
