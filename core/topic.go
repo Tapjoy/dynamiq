@@ -12,7 +12,7 @@ type Topic struct {
 	// the definition of a queue
 	// name of the queue
 	Name string
-
+	// RiakService for interacting with Riak
 	// Mutex for protecting rw access to the Config object
 	configLock sync.RWMutex
 	// Individual settings for the queue

@@ -49,29 +49,29 @@ func (rs *RiakService) Execute(cmd riak.Command) error {
 }
 
 // GetQueueConfigMap loads the primary queue configuration data from Riak, as a native riak.Map
-func (rs *RiakService) GetQueueConfigMap() (*riak.Map, error) {
+func (rs *RiakService) GetQueuesConfigMap() (*riak.Map, error) {
 	return rs.GetMap("queues_config")
 }
 
 // GetTopicConfigMap loads the primary topic configuration data from Riak, as a native riak.Map
-func (rs *RiakService) GetTopicConfigMap() (*riak.Map, error) {
+func (rs *RiakService) GetTopicsConfigMap() (*riak.Map, error) {
 	return rs.GetMap("topics_config")
 }
 
 // CreateQueueConfigMap is
-func (rs *RiakService) CreateQueueConfigMap() (*riak.Map, error) {
+func (rs *RiakService) CreateQueuesConfigMap() (*riak.Map, error) {
 	op := &riak.MapOperation{}
 	op.SetRegister("created", []byte(time.Now().String()))
 
-	return rs.CreateOrUpdateMap("config", "queues_config", op)
+	return rs.CreateOrUpdateMap("config", "queues_config", []*riak.MapOperation{op})
 }
 
 // CreateTopicConfigMap is
-func (rs *RiakService) CreateTopicConfigMap() (*riak.Map, error) {
+func (rs *RiakService) CreateTopicsConfigMap() (*riak.Map, error) {
 	op := &riak.MapOperation{}
 	op.SetRegister("created", []byte(time.Now().String()))
 
-	return rs.CreateOrUpdateMap("config", "topics_config", op)
+	return rs.CreateOrUpdateMap("config", "topics_config", []*riak.MapOperation{op})
 }
 
 // GetMap loads a CRDT Map from Riak
@@ -103,13 +103,16 @@ func (rs *RiakService) GetMap(name string) (*riak.Map, error) {
 }
 
 // CreateOrUpdateMap does exactly that because thats what the riak lib allows for
-func (rs *RiakService) CreateOrUpdateMap(bucket string, key string, op *riak.MapOperation) (*riak.Map, error) {
-	cmd, err := riak.NewUpdateMapCommandBuilder().
+func (rs *RiakService) CreateOrUpdateMap(bucket string, key string, ops []*riak.MapOperation) (*riak.Map, error) {
+	cBuilder := riak.NewUpdateMapCommandBuilder().
 		WithBucketType("maps").
 		WithBucket(bucket).
-		WithMapOperation(op).
 		WithReturnBody(true).
-		WithKey(key).Build()
+		WithKey(key)
+	for _, op := range ops {
+		cBuilder = cBuilder.WithMapOperation(op)
+	}
+	cmd, err := cBuilder.Build()
 
 	if err != nil {
 		return nil, err
@@ -130,9 +133,10 @@ func (rs *RiakService) CreateQueueConfig(queueName string, values map[string]str
 		op.SetRegister(key, []byte(value))
 	}
 
-	return rs.CreateOrUpdateMap("config", queueConfigRecordName(queueName), op)
+	return rs.CreateOrUpdateMap("config", queueConfigRecordName(queueName), []*riak.MapOperation{op})
 }
 
+// RangeScanMessages is
 func (rs *RiakService) RangeScanMessages(queueName string, numMessages uint32, lowerBound int64, upperBound int64) ([]*riak.Object, error) {
 	cmd, err := riak.NewSecondaryIndexQueryCommandBuilder().
 		WithBucketType("messages").
@@ -157,8 +161,11 @@ func (rs *RiakService) RangeScanMessages(queueName string, numMessages uint32, l
 }
 
 func (rs *RiakService) lookupMessagesForRangeScanResults(queueName string, results []*riak.SecondaryIndexQueryResult) ([]*riak.Object, error) {
+	// Channel for holding the results of the io calls
 	objChan := make(chan []*riak.Object, len(results))
+	// Waitgroup to gate the function completing
 	wg := &sync.WaitGroup{}
+	// Seed it with the expected number of ops
 	wg.Add(len(results))
 	for _, item := range results {
 		key := string(item.ObjectKey)
@@ -195,7 +202,9 @@ func (rs *RiakService) lookupMessagesForRangeScanResults(queueName string, resul
 		close(oChan)
 	}(wg, objChan)
 
+	// Allocate it all up front to save some time
 	foundMessages := make([]*riak.Object, len(results))
+	// Keep track of how many actually returned, for later
 	foundCount := 0
 	for objs := range objChan {
 		if len(objs) > 1 {
@@ -215,7 +224,7 @@ func (rs *RiakService) lookupMessagesForRangeScanResults(queueName string, resul
 		foundMessages[foundCount] = objs[0]
 		foundCount++
 	}
-
+	// Return only the slice of messages found
 	return foundMessages[:foundCount], nil
 }
 
@@ -280,18 +289,23 @@ func (rs *RiakService) DeleteMessage(queueName string, key string) (bool, error)
 }
 
 func (rs *RiakService) DeleteMessages(queueName string, keys []string) (map[string]bool, error) {
+	// Channel for holding the results of the io calls
 	boolChan := make(chan *deletedMessage, len(keys))
+	// Waitgroup to gate the function completing
 	wg := &sync.WaitGroup{}
+	// Seed it with the expected number of ops
 	wg.Add(len(keys))
 
 	results := make(map[string]bool, len(keys))
 
 	for _, mKey := range keys {
+		// Kick off a go routine to delete the message
 		go func(riakService *RiakService, w *sync.WaitGroup, c chan *deletedMessage, messageKey string) {
 			defer w.Done()
 
 			deleted, err := riakService.DeleteMessage(queueName, messageKey)
 			if err != nil {
+				// Pop the results onto the channel
 				c <- &deletedMessage{key: messageKey, deleted: deleted}
 			}
 			return
@@ -305,16 +319,59 @@ func (rs *RiakService) DeleteMessages(queueName string, keys []string) (map[stri
 		close(c)
 	}(wg, boolChan)
 
+	// Harvest until the channel closes
 	for obj := range boolChan {
 		results[obj.key] = obj.deleted
 	}
 	return results, nil
 }
 
+func (rs *RiakService) UpdateTopicSubscription(topicName string, queueName string, addQueue bool) (bool, error) {
+	// Probably less awkward to just have the calling code build the cmd but...
+	// I'm trying to keep all the riak stuff in one place
+
+	// Also - this needs to verify both exist before attempting to map them
+	// It doesn't, currently
+	op := &riak.MapOperation{}
+	if addQueue {
+		op.AddToSet("queues", []byte(queueName))
+	} else {
+		op.RemoveFromSet("queues", []byte(queueName))
+	}
+	cmd, err := riak.NewUpdateMapCommandBuilder().
+		WithBucketType("maps").
+		WithBucket("config").
+		WithKey(topicConfigRecordName(topicName)).
+		WithMapOperation(op).Build()
+
+	if err != nil {
+		return false, err
+	}
+
+	if err = rs.Execute(cmd); err != nil {
+		return false, err
+	}
+	res := cmd.(*riak.UpdateMapCommand)
+	if res.Error() != nil {
+		return false, res.Error()
+	}
+
+	// If the op is a success, its a success
+	return res.Success(), nil
+}
+
+func (rs *RiakService) GetQueueConfigMap(queueName string) (*riak.Map, error) {
+	return rs.GetMap(queueConfigRecordName(queueName))
+}
+
+func (rs *RiakService) GetTopicConfigMap(topicName string) (*riak.Map, error) {
+	return rs.GetMap(topicConfigRecordName(topicName))
+}
+
 func queueConfigRecordName(queueName string) string {
 	return fmt.Sprintf("queue_%s_config", queueName)
 }
 
-func topicConfigRecordName(queueName string) string {
-	return fmt.Sprintf("topic_%s_config", queueName)
+func topicConfigRecordName(topicName string) string {
+	return fmt.Sprintf("topic_%s_config", topicName)
 }

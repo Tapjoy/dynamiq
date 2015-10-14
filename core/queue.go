@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/StabbyCutyou/partition_ring"
-	"github.com/tpjg/goriakpbc"
+	"github.com/basho/riak-go-client"
 )
 
 // Queue represents a bucket in Riak used to hold messages, and the behaviors that
@@ -20,7 +20,7 @@ type Queue struct {
 	// Mutex for protecting rw access to the Config object
 	configLock sync.RWMutex
 	// Individual settings for the queue
-	Config *riak.RDtMap
+	Config *riak.Map
 }
 
 // Define statistics keys suffixes

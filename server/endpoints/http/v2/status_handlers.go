@@ -8,7 +8,7 @@ import (
 
 func (h *HTTPApi) statusServers(w http.ResponseWriter, r *http.Request) {
 	response := make([]string, 0)
-	for _, member := range h.memberList.Members() {
+	for _, member := range h.context.Discovery.Memberlist.Members() {
 		response = append(response, fmt.Sprintf("Member: %s %s", member.Name, member.Addr))
 	}
 	w.WriteHeader(http.StatusOK)

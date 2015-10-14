@@ -17,6 +17,16 @@ func main2() {
 		log.Fatal(err)
 	}
 
+	ok, err := cfg.Queues.Create("tq1", make(map[string]string))
+	if !ok || err != nil {
+		log.Fatal(err)
+	}
+
+	ok, err = cfg.Topics.Create("tt1")
+	if !ok || err != nil {
+		log.Fatal(err)
+	}
+
 	messages, err := cfg.Riak.Service.RangeScanMessages("tq1", 20, 0, math.MaxInt64)
 	if err != nil {
 		log.Println(err)

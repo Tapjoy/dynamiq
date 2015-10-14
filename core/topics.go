@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -14,24 +15,29 @@ type Topics struct {
 	syncScheduler *time.Ticker
 	syncKiller    chan bool
 
-	configLock sync.RWMutex
-	Config     *riak.Map
-	TopicMap   map[string]*Topic
+	configLock  sync.RWMutex
+	Config      *riak.Map
+	KnownTopics map[string]*Topic
 }
 
+var (
+	//ErrNoKnownTopics
+	ErrNoKnownTopics = errors.New("There are no known topics in the system")
+)
+
 // LoadTopicsFromRiak is
-func LoadTopicsFromRiak(cfg *Config) (*Topics, error) {
+func LoadTopicsFromRiak(cfg *RiakConfig) (*Topics, error) {
 	topics := &Topics{
-		TopicMap:      make(map[string]*Topic),
-		syncScheduler: time.NewTicker(cfg.Riak.ConfigSyncInterval),
+		KnownTopics:   make(map[string]*Topic),
+		syncScheduler: time.NewTicker(cfg.ConfigSyncInterval),
 		syncKiller:    make(chan bool, 0),
-		riakService:   cfg.Riak.Service,
+		riakService:   cfg.Service,
 		configLock:    sync.RWMutex{},
 	}
 
-	m, err := topics.riakService.GetTopicConfigMap()
+	m, err := topics.riakService.GetTopicsConfigMap()
 	if err == ErrConfigMapNotFound {
-		m, err = topics.riakService.CreateTopicConfigMap()
+		m, err = topics.riakService.CreateTopicsConfigMap()
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +64,7 @@ func (topics *Topics) Create(queueName string) (bool, error) {
 	// build the operation to update the set
 	op := &riak.MapOperation{}
 	op.AddToSet("topics", []byte(queueName))
-	_, err := topics.riakService.CreateOrUpdateMap("config", "topics_config", op)
+	_, err := topics.riakService.CreateOrUpdateMap("config", "topics_config", []*riak.MapOperation{op})
 	if err != nil {
 		return false, err
 	}
@@ -75,7 +81,7 @@ func (topics *Topics) Delete(queueName string) (bool, error) {
 
 // Exists checks is the given topic name is already created or not
 func (topics *Topics) Exists(topicName string) (bool, error) {
-	m, err := topics.riakService.GetTopicConfigMap()
+	m, err := topics.riakService.GetTopicsConfigMap()
 	if err != nil {
 		return false, err
 	}
@@ -87,4 +93,14 @@ func (topics *Topics) Exists(topicName string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (topics *Topics) SubscribeQueue(topicName string, queueName string) (bool, error) {
+	// Add the queue to the topic
+	return topics.riakService.UpdateTopicSubscription(topicName, queueName, true)
+}
+
+func (topics *Topics) UnsubscribeQueue(topicName string, queueName string) (bool, error) {
+	// Remove the queue from the topic
+	return topics.riakService.UpdateTopicSubscription(topicName, queueName, false)
 }

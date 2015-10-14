@@ -1,38 +1,24 @@
 package httpv2
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/Tapjoy/dynamiq/core"
 	"github.com/gorilla/mux"
-	"github.com/hashicorp/memberlist"
 )
 
 // HTTPApi represents the object used to govern http calls into the system
 type HTTPApi struct {
-	memberList *memberlist.Memberlist
-	topics     *core.Topics
-	queues     *core.Queues
-	port       uint16
+	context *core.Config
 }
 
 // New initializes a new
 func New(cfg *core.Config) (*HTTPApi, error) {
-	t, err := core.LoadTopicsFromRiak(cfg)
-	if err != nil {
-		return nil, err
-	}
-	q, err := core.LoadQueuesFromRiak(cfg)
-	if err != nil {
-		return nil, err
-	}
 	h := &HTTPApi{
-		memberList: cfg.Discovery.Memberlist,
-		topics:     t,
-		queues:     q,
-		port:       cfg.HTTP.Port,
+		context: cfg,
 	}
 	router := mux.NewRouter().PathPrefix("/v2").Subrouter()
 
@@ -66,6 +52,15 @@ func New(cfg *core.Config) (*HTTPApi, error) {
 }
 
 // Listen is
-func (api *HTTPApi) Listen() {
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", api.port), nil))
+func (h *HTTPApi) Listen() {
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", h.context.HTTP.Port), nil))
+}
+
+func response(w http.ResponseWriter, responsePayload map[string]interface{}) {
+	json.NewEncoder(w).Encode(responsePayload)
+}
+
+func errorResponse(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(map[string]error{"error": err})
 }
