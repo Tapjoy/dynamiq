@@ -56,7 +56,8 @@ func (h *HTTPApi) Listen() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", h.context.HTTP.Port), nil))
 }
 
-func response(w http.ResponseWriter, responsePayload map[string]interface{}) {
+func response(w http.ResponseWriter, status int, responsePayload map[string]interface{}) {
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(responsePayload)
 }
 

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -53,6 +54,11 @@ type Config struct {
 	syncKiller    chan bool
 }
 
+var (
+	//ErrUnknownTopic is
+	ErrUnknownTopic = errors.New("There is no known topic by that name")
+)
+
 // GetConfig Parses and returns a config object
 func GetConfig() (*Config, error) {
 	// TODO settle on an actual config package
@@ -98,6 +104,29 @@ func GetConfig() (*Config, error) {
 	}
 	cfg.beginSync()
 	return cfg, nil
+}
+
+// TopicNames is
+func (cfg *Config) TopicNames() []string {
+	cfg.Topics.configLock.RLock()
+	list := make([]string, 0)
+
+	for name := range cfg.Topics.KnownTopics {
+		list = append(list, name)
+	}
+	cfg.Topics.configLock.RUnlock()
+	return list
+}
+
+// GetTopic is
+func (cfg *Config) GetTopic(name string) (*Topic, error) {
+	cfg.Topics.configLock.RLock()
+	t, ok := cfg.Topics.KnownTopics[name]
+	cfg.Topics.configLock.RUnlock()
+	if ok {
+		return t, nil
+	}
+	return nil, ErrUnknownTopic
 }
 
 func (cfg *Config) beginSync() {

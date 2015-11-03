@@ -18,3 +18,14 @@ type Topic struct {
 	// Individual settings for the queue
 	Config *riak.Map
 }
+
+// GetQueueNames is
+func (t *Topic) GetQueueNames() []string {
+	t.configLock.RLock()
+	names := make([]string, 0)
+	for _, q := range t.Config.Sets["queues"] {
+		names = append(names, string(q))
+	}
+	t.configLock.RUnlock()
+	return names
+}

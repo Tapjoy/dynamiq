@@ -8,7 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/Tapjoy/dynamiq/app"
 	"github.com/Tapjoy/dynamiq/core"
-	"github.com/Tapjoy/dynamiq/server/endpoints/http/v2"
+	"github.com/Tapjoy/dynamiq/server/http/v2"
 )
 
 func main2() {
