@@ -59,13 +59,3 @@ func (queue *Queue) PollMessages(batchSize uint32) (map[string]string, error) {
 	}
 	return results, err
 }
-
-// DeleteMessage is
-func (queue *Queue) DeleteMessage(id string) (map[string]bool, error) {
-	return queue.DeleteMessages([]string{id})
-}
-
-// DeleteMessages is
-func (queue *Queue) DeleteMessages(ids []string) (map[string]bool, error) {
-	return queue.riakService.DeleteMessages(queue.Name, ids)
-}

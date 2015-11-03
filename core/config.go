@@ -129,6 +129,32 @@ func (cfg *Config) GetTopic(name string) (*Topic, error) {
 	return nil, ErrUnknownTopic
 }
 
+// TopicNames is
+func (cfg *Config) QueueNames() []string {
+	cfg.Queues.configLock.RLock()
+	list := make([]string, 0)
+
+	for name := range cfg.Queues.KnownQueues {
+		list = append(list, name)
+	}
+	cfg.Queues.configLock.RUnlock()
+	return list
+}
+
+func (cfg *Config) GetQueueConfig(name string) (map[string]string, error) {
+	cfg.Queues.configLock.RLock()
+	m, err := cfg.Riak.Service.GetQueueConfigMap(name)
+	if err != nil {
+		return nil, err
+	}
+	results := make(map[string]string, len(m.Registers))
+	for k, v := range m.Registers {
+		results[k] = string(v)
+	}
+	cfg.Queues.configLock.RUnlock()
+	return results, nil
+}
+
 func (cfg *Config) beginSync() {
 	// Go routine to listen to either the scheduler or the killer
 	go func(config *Config) {

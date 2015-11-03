@@ -8,8 +8,6 @@ import (
 )
 
 func (h *HTTPApi) topicList(w http.ResponseWriter, r *http.Request) {
-	// TODO need to move topics/queues into a config manager to lock their access
-	// due to the goroutines that update and need to lock them
 	response(w, http.StatusOK, map[string]interface{}{"topics": h.context.TopicNames()})
 }
 
