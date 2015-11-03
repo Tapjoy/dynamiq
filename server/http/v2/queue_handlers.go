@@ -1,6 +1,7 @@
 package httpv2
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/Tapjoy/dynamiq/core"
@@ -51,7 +52,15 @@ func (h *HTTPApi) queueSubmitMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPApi) queueGetMessage(w http.ResponseWriter, r *http.Request) {
-
+	vars := mux.Vars(r)
+	queueName := vars["queue"]
+	id := vars["id"]
+	msg, err := h.context.Queues.GetMessage(queueName, id)
+	if err != nil {
+		errorResponse(w, err)
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(msg)
 }
 
 func (h *HTTPApi) queuePollMessage(w http.ResponseWriter, r *http.Request) {

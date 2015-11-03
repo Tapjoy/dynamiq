@@ -160,6 +160,38 @@ func (rs *RiakService) RangeScanMessages(queueName string, numMessages uint32, l
 	return rs.lookupMessagesForRangeScanResults(queueName, res.Response.Results)
 }
 
+func (rs *RiakService) GetMessage(queueName string, messageKey string) (string, error) {
+	cmd, err := riak.NewFetchValueCommandBuilder().
+		WithBucketType("messages").
+		WithBucket(queueName).
+		WithKey(messageKey).Build()
+
+	if err != nil {
+		return "", err
+	}
+	if err = rs.Execute(cmd); err != nil {
+		return "", err
+	}
+
+	res := cmd.(*riak.FetchValueCommand)
+	if res.Error() != nil || res.Response.IsNotFound {
+		return "", res.Error()
+	}
+
+	if len(res.Response.Values) > 1 {
+		for _, obj := range res.Response.Values[1:len(res.Response.Values)] {
+			_, err := rs.StoreMessage(queueName, string(obj.Value))
+			if err != nil {
+				// Couldn't save that Message
+				// That would mean it's lost
+				// need to incorporate a retry mechanic
+			}
+		}
+	}
+
+	return string(res.Response.Values[0].Value), nil
+}
+
 func (rs *RiakService) lookupMessagesForRangeScanResults(queueName string, results []*riak.SecondaryIndexQueryResult) ([]*riak.Object, error) {
 	// Channel for holding the results of the io calls
 	objChan := make(chan []*riak.Object, len(results))

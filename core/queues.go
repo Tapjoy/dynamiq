@@ -141,11 +141,12 @@ func (queues *Queues) Exists(queueName string) (bool, error) {
 	return false, nil
 }
 
+func (q *Queues) GetMessage(queueName string, id string) (string, error) {
+	return q.riakService.GetMessage(queueName, id)
+}
+
 func (q *Queues) SaveMessage(queueName string, data string) (string, error) {
-	q.configLock.RLock()
-	id, err := q.riakService.StoreMessage(queueName, data)
-	q.configLock.RUnlock()
-	return id, err
+	return q.riakService.StoreMessage(queueName, data)
 }
 
 // DeleteMessage is
