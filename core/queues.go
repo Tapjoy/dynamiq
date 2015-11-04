@@ -3,6 +3,7 @@ package core
 // Queues represents a collection of Queues, and the behaviors that may be taken
 import (
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/basho/riak-go-client"
@@ -87,24 +88,26 @@ func (queues *Queues) Create(queueName string, options map[string]string) (bool,
 	// build the operation to update the set
 	op := &riak.MapOperation{}
 	op.AddToSet("queues", []byte(queueName))
-	_, err := queues.riakService.CreateOrUpdateMap("config", "queues_config", []*riak.MapOperation{op})
+	_, err := queues.riakService.CreateOrUpdateMap("config", "queues_config", op)
 	if err != nil {
 		return false, err
 	}
 
-	cfgOps := make([]*riak.MapOperation, 0)
+	//cfgOps := make([]*riak.MapOperation, 0)
 	// Create the config
+	cOp := &riak.MapOperation{}
 	for name, defaultValue := range DefaultSettings {
-		cOp := &riak.MapOperation{}
 		if val, ok := options[name]; ok {
+			log.Println("Found a setting for this", name, " ", val)
 			cOp.SetRegister(name, []byte(val))
 		} else {
+			log.Println("Found a default setting for this", name, " ", val)
 			cOp.SetRegister(name, []byte(defaultValue))
 		}
-		cfgOps = append(cfgOps, cOp)
+		//cfgOps = append(cfgOps, cOp)
 	}
 
-	_, err = queues.riakService.CreateOrUpdateMap("config", queueConfigRecordName(queueName), cfgOps)
+	_, err = queues.riakService.CreateOrUpdateMap("config", queueConfigRecordName(queueName), cOp)
 	if err != nil {
 		return false, err
 	}

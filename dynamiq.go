@@ -17,20 +17,26 @@ func main2() {
 		log.Fatal(err)
 	}
 
-	ok, err := cfg.Queues.Create("tq1", make(map[string]string))
+	ok, err := cfg.Topics.Create("tt1")
 	if !ok || err != nil {
 		log.Fatal(err)
 	}
 
-	ok, err = cfg.Topics.Create("tt1")
+	ok, err = cfg.Queues.Create("tq1", make(map[string]string))
+	if !ok || err != nil {
+		log.Fatal(err)
+	}
+
+	ok, err = cfg.Topics.SubscribeQueue("tt1", "tq1")
 	if !ok || err != nil {
 		log.Fatal(err)
 	}
 
 	messages, err := cfg.Riak.Service.RangeScanMessages("tq1", 20, 0, math.MaxInt64)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
+
 	log.Println("Stuff")
 	log.Println(messages)
 	httpServer, err := httpv2.New(cfg)

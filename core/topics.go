@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"time"
 
@@ -21,8 +22,10 @@ type Topics struct {
 }
 
 var (
-	//ErrNoKnownTopics
+	//ErrNoKnownTopics is
 	ErrNoKnownTopics = errors.New("There are no known topics in the system")
+	// ErrTopicAlreadyExists is
+	ErrTopicAlreadyExists = errors.New("Topic already exists")
 )
 
 // LoadTopicsFromRiak is
@@ -57,15 +60,16 @@ func (topics *Topics) Create(queueName string) (bool, error) {
 
 	if ok, err := topics.Exists(queueName); ok || err != nil {
 		if err == nil {
-			return false, ErrQueueAlreadyExists
+			return false, ErrTopicAlreadyExists
 		}
 		return false, err
 	}
 	// build the operation to update the set
 	op := &riak.MapOperation{}
 	op.AddToSet("topics", []byte(queueName))
-	_, err := topics.riakService.CreateOrUpdateMap("config", "topics_config", []*riak.MapOperation{op})
+	_, err := topics.riakService.CreateOrUpdateMap("config", "topics_config", op)
 	if err != nil {
+		log.Println(err)
 		return false, err
 	}
 	return true, nil

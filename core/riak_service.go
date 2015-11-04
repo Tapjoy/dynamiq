@@ -63,7 +63,7 @@ func (rs *RiakService) CreateQueuesConfigMap() (*riak.Map, error) {
 	op := &riak.MapOperation{}
 	op.SetRegister("created", []byte(time.Now().String()))
 
-	return rs.CreateOrUpdateMap("config", "queues_config", []*riak.MapOperation{op})
+	return rs.CreateOrUpdateMap("config", "queues_config", op)
 }
 
 // CreateTopicConfigMap is
@@ -71,7 +71,7 @@ func (rs *RiakService) CreateTopicsConfigMap() (*riak.Map, error) {
 	op := &riak.MapOperation{}
 	op.SetRegister("created", []byte(time.Now().String()))
 
-	return rs.CreateOrUpdateMap("config", "topics_config", []*riak.MapOperation{op})
+	return rs.CreateOrUpdateMap("config", "topics_config", op)
 }
 
 // GetMap loads a CRDT Map from Riak
@@ -103,16 +103,13 @@ func (rs *RiakService) GetMap(name string) (*riak.Map, error) {
 }
 
 // CreateOrUpdateMap does exactly that because thats what the riak lib allows for
-func (rs *RiakService) CreateOrUpdateMap(bucket string, key string, ops []*riak.MapOperation) (*riak.Map, error) {
-	cBuilder := riak.NewUpdateMapCommandBuilder().
+func (rs *RiakService) CreateOrUpdateMap(bucket string, key string, op *riak.MapOperation) (*riak.Map, error) {
+	cmd, err := riak.NewUpdateMapCommandBuilder().
 		WithBucketType("maps").
 		WithBucket(bucket).
 		WithReturnBody(true).
-		WithKey(key)
-	for _, op := range ops {
-		cBuilder = cBuilder.WithMapOperation(op)
-	}
-	cmd, err := cBuilder.Build()
+		WithKey(key).
+		WithMapOperation(op).Build()
 
 	if err != nil {
 		return nil, err
@@ -133,7 +130,7 @@ func (rs *RiakService) CreateQueueConfig(queueName string, values map[string]str
 		op.SetRegister(key, []byte(value))
 	}
 
-	return rs.CreateOrUpdateMap("config", queueConfigRecordName(queueName), []*riak.MapOperation{op})
+	return rs.CreateOrUpdateMap("config", queueConfigRecordName(queueName), op)
 }
 
 // RangeScanMessages is

@@ -240,7 +240,7 @@ func (cfg *Config) syncConfig() error {
 			// If the config object isn't found - no big deal
 			// Only config presently is a list of queues, the object will
 			// be created when the first queue is set
-			log.Println(err, tName)
+			// This is a NOOP, but left in for documentation purposes
 		}
 		t.Config = topcfg
 		cfg.Topics.KnownTopics[tName] = t
