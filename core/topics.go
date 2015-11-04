@@ -109,18 +109,23 @@ func (topics *Topics) UnsubscribeQueue(topicName string, queueName string) (bool
 	return topics.riakService.UpdateTopicSubscription(topicName, queueName, false)
 }
 
-func (t *Topics) BroadcastMessage(topicName string, data string) []map[string]interface{} {
+func (t *Topics) BroadcastMessage(topicName string, data string) ([]map[string]interface{}, error) {
 	t.configLock.RLock()
-	results := make([]map[string]interface{}, len(t.Config.Sets["queues"]))
-	for _, q := range t.Config.Sets["queues"] {
+	topic, ok := t.KnownTopics[topicName]
+	if !ok {
+		return nil, ErrUnknownTopic
+	}
+	results := make([]map[string]interface{}, 0)
+	for _, q := range topic.Config.Sets["queues"] {
 		queueName := string(q)
+		log.Println("Queue is", queueName)
 		id, err := t.riakService.StoreMessage(queueName, data)
-		result := map[string]interface{}{"id": id}
+		result := map[string]interface{}{"id": id, "queue": queueName}
 		if err != nil {
 			result[queueName] = err.Error()
 		}
 		results = append(results, result)
 	}
 	t.configLock.RUnlock()
-	return results
+	return results, nil
 }

@@ -2,6 +2,8 @@ package httpv2
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -36,10 +38,18 @@ func (h *HTTPApi) topicDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *HTTPApi) topicSubmitMessage(w http.ResponseWriter, r *http.Request) {
 	topicName := mux.Vars(r)["topic"]
-	msgData := "" // TODO read from body
+	msgData, err := ioutil.ReadAll(r.Body)
+	r.Body.Close()
 
-	results := h.context.Topics.BroadcastMessage(topicName, msgData)
+	if err != nil {
+		errorResponse(w, err)
+	}
 
+	results, err := h.context.Topics.BroadcastMessage(topicName, string(msgData))
+	if err != nil {
+		errorResponse(w, err)
+	}
+	log.Println(results)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(results)
 }
