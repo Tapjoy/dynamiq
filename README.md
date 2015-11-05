@@ -10,6 +10,8 @@ Dynamiq is currently in use in production at Tapjoy. However, the product is sti
 
 We encourage interested parties to use Dynamiq, understanding that prior to an official v1 release, things could change.
 
+There is currently a Version 2 update underway, which you can check out [here](https://github.com/Tapjoy/dynamiq/tree/feature/httpapi_v2)
+
 Caveat Emptor
 
 What is Dynamiq?
