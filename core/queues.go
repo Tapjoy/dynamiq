@@ -66,7 +66,9 @@ func LoadQueuesFromRiak(cfg *RiakConfig) (*Queues, error) {
 
 	// TODO
 	// Initialize a Queue object for each one in the set
-	// Store it by name in KnownQueus
+	// Store it by name in KnownQueues
+
+	// Need to use a general LoadFromRiak method
 
 	return queues, nil
 }
@@ -160,4 +162,32 @@ func (queues *Queues) DeleteMessage(name string, id string) (map[string]bool, er
 // DeleteMessages is
 func (queues *Queues) DeleteMessages(name string, ids []string) (map[string]bool, error) {
 	return queues.riakService.DeleteMessages(name, ids)
+}
+
+// PollMessages does a range scan over the queue bucket and returns a map of message ids to bodies
+func (queues *Queues) PollMessages(name string, batchSize uint32) (map[string]string, error) {
+	queues.configLock.RLock()
+	defer queues.configLock.RUnlock()
+	log.Println(queues.KnownQueues)
+	log.Println(queues.Config)
+	queue, ok := queues.KnownQueues[name]
+	if !ok {
+		log.Println("not found")
+		return nil, ErrUnknownQueue
+	}
+	lower, upper, err := queue.ring.ReserveNext()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	riakObjects, err := queue.riakService.RangeScanMessages(queue.Name, batchSize, lower, upper)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	results := make(map[string]string, len(riakObjects))
+	for _, obj := range riakObjects {
+		results[obj.Key] = string(obj.Value)
+	}
+	return results, nil
 }

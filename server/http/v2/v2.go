@@ -45,7 +45,7 @@ func New(cfg *core.Config) (*HTTPApi, error) {
 	queueRoutes.HandleFunc("/{queue}", h.queueSubmitMessage).Methods("POST")
 	queueRoutes.HandleFunc("/{queue}/{id}", h.queueGetMessage).Methods("GET")
 	queueRoutes.HandleFunc("/{queue}/{id}", h.queueDeleteMessage).Methods("DELETE")
-	queueRoutes.HandleFunc("/{queue}/poll/{num}", h.queuePollMessage).Methods("GET")
+	queueRoutes.HandleFunc("/{queue}/poll/{count}", h.queuePollMessage).Methods("GET")
 
 	http.Handle("/", router)
 	return h, nil

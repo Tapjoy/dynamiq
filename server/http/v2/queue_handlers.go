@@ -2,7 +2,9 @@ package httpv2
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/Tapjoy/dynamiq/core"
 	"github.com/gorilla/mux"
@@ -17,6 +19,7 @@ func (h *HTTPApi) queueDetails(w http.ResponseWriter, r *http.Request) {
 	conf, err := h.context.GetQueueConfig(queueName)
 	if err != nil {
 		errorResponse(w, err)
+		return
 	}
 	response(w, http.StatusOK, map[string]interface{}{"queue": queueName, "config": conf})
 }
@@ -31,6 +34,7 @@ func (h *HTTPApi) queueCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// return 500 for now - should return contextually correct errors otherwise
 		errorResponse(w, err)
+		return
 	}
 	response(w, http.StatusOK, map[string]interface{}{"queue": queueName, "created": ok})
 
@@ -47,6 +51,7 @@ func (h *HTTPApi) queueSubmitMessage(w http.ResponseWriter, r *http.Request) {
 	id, err := h.context.Queues.SaveMessage(queueName, msgData)
 	if err != nil {
 		errorResponse(w, err)
+		return
 	}
 	response(w, http.StatusOK, map[string]interface{}{"queue": queueName, "id": id})
 }
@@ -58,13 +63,33 @@ func (h *HTTPApi) queueGetMessage(w http.ResponseWriter, r *http.Request) {
 	msg, err := h.context.Queues.GetMessage(queueName, id)
 	if err != nil {
 		errorResponse(w, err)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(msg)
 }
 
 func (h *HTTPApi) queuePollMessage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	queueName := vars["queue"]
+	log.Println(queueName)
+	count := vars["count"]
 
+	uCount, err := strconv.ParseUint(count, 10, 32)
+	if err != nil {
+		errorResponse(w, err)
+		return
+	}
+
+	msgs, err := h.context.Queues.PollMessages(queueName, uint32(uCount))
+
+	if err != nil {
+		errorResponse(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(msgs)
 }
 
 func (h *HTTPApi) queueDeleteMessage(w http.ResponseWriter, r *http.Request) {
@@ -75,6 +100,7 @@ func (h *HTTPApi) queueDeleteMessage(w http.ResponseWriter, r *http.Request) {
 	ok, err := h.context.Queues.DeleteMessage(queueName, id)
 	if err != nil {
 		errorResponse(w, err)
+		return
 	}
 	response(w, http.StatusOK, map[string]interface{}{"queue": queueName, "deleted": ok})
 

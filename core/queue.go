@@ -42,20 +42,3 @@ const QueueDepthAprStatsSuffix = "approximate_depth.count"
 
 // QueueFillDeltaStatsSuffix
 const QueueFillDeltaStatsSuffix = "fill.count"
-
-// PollMessages does a range scan over the queue bucket and returns a map of message ids to bodies
-func (queue *Queue) PollMessages(batchSize uint32) (map[string]string, error) {
-	lower, upper, err := queue.ring.ReserveNext()
-	if err != nil {
-		return nil, err
-	}
-	riakObjects, err := queue.riakService.RangeScanMessages(queue.Name, batchSize, lower, upper)
-	if err != nil {
-		return nil, err
-	}
-	results := make(map[string]string, len(riakObjects))
-	for _, obj := range riakObjects {
-		results[obj.Key] = string(obj.Value)
-	}
-	return results, err
-}

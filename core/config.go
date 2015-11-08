@@ -57,6 +57,9 @@ type Config struct {
 var (
 	//ErrUnknownTopic is
 	ErrUnknownTopic = errors.New("There is no known topic by that name")
+
+	//ErrUnknownTopic is
+	ErrUnknownQueue = errors.New("There is no known queue by that name")
 )
 
 // GetConfig Parses and returns a config object
@@ -302,8 +305,8 @@ func (cfg *Config) syncConfig() error {
 		// Add or Update the topic to the known set
 		var q *Queue
 		if q, ok = cfg.Queues.KnownQueues[qName]; !ok {
-			// Didn't exist in memory, so create it
-			// TODO centralize this, don't just re-write initialization logic
+			// TODO see node in LoadQueuesFromRiak about the need For
+			// and independent LoadFromRiak method
 			q = &Queue{
 				Name:       qName,
 				configLock: sync.RWMutex{},
