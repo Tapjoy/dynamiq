@@ -4,8 +4,11 @@ package core
 import (
 	"errors"
 	"log"
+	"strconv"
 	"sync"
+	"time"
 
+	"github.com/StabbyCutyou/partition_ring"
 	"github.com/basho/riak-go-client"
 )
 
@@ -28,7 +31,7 @@ var (
 	// Settings Arrays and maps cannot be made immutable in golang
 	Settings = [...]string{VisibilityTimeout, PartitionStep, CompressedMessages}
 	// DefaultSettings is
-	DefaultSettings = map[string]string{VisibilityTimeout: "30", PartitionStep: "5000000", CompressedMessages: "false"}
+	DefaultSettings = map[string]string{VisibilityTimeout: "5s", PartitionStep: "5000000", CompressedMessages: "false"}
 )
 
 // Queues represents a collection of Queue objects, and the behaviors that may be
@@ -64,13 +67,46 @@ func LoadQueuesFromRiak(cfg *RiakConfig) (*Queues, error) {
 	}
 	queues.Config = m
 
-	// TODO
-	// Initialize a Queue object for each one in the set
-	// Store it by name in KnownQueues
-
+	for _, q := range queues.Config.Sets["queues"] {
+		queueName := string(q)
+		rQueue, err := LoadQueueFromRiak(queues.riakService, queueName)
+		if err != nil {
+			return nil, err
+		}
+		queues.KnownQueues[queueName] = rQueue
+	}
 	// Need to use a general LoadFromRiak method
 
 	return queues, nil
+}
+
+func LoadQueueFromRiak(rs *RiakService, queueName string) (*Queue, error) {
+	cfg, err := rs.GetQueueConfigMap(queueName)
+	if err != nil {
+		return nil, err
+	}
+
+	step := cfg.Registers[PartitionStep]
+	intStep, err := strconv.ParseInt(string(step), 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	visTimeout := cfg.Registers[VisibilityTimeout]
+	timeDuration, err := time.ParseDuration(string(visTimeout))
+
+	if err != nil {
+		return nil, err
+	}
+
+	q := &Queue{
+		Name:        queueName,
+		Config:      cfg,
+		configLock:  sync.RWMutex{},
+		riakService: rs,
+		ring:        partitionring.New(0, partitionring.MaxPartitionUpperBound, intStep, timeDuration),
+	}
+
+	return q, nil
 }
 
 // Create will register a new queue with the default config

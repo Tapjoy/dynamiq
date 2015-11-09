@@ -301,24 +301,17 @@ func (cfg *Config) syncConfig() error {
 	for _, queue := range newSet {
 		qName := string(queue)
 		// Record this so we know who to evict
-		topicsToKeep[qName] = true
+		queuesToKeep[qName] = true
 		// Add or Update the topic to the known set
 		var q *Queue
 		if q, ok = cfg.Queues.KnownQueues[qName]; !ok {
 			// TODO see node in LoadQueuesFromRiak about the need For
 			// and independent LoadFromRiak method
-			q = &Queue{
-				Name:       qName,
-				configLock: sync.RWMutex{},
+			q, err = LoadQueueFromRiak(cfg.Riak.Service, qName)
+			if err != nil {
+				return err
 			}
 		}
-		// get the config and set it on the topic
-		queuecfg, err := cfg.Riak.Service.GetQueueConfigMap(qName)
-		if err != nil {
-			log.Println(err, qName)
-			return err
-		}
-		q.Config = queuecfg
 		cfg.Queues.KnownQueues[qName] = q
 	}
 
@@ -328,7 +321,6 @@ func (cfg *Config) syncConfig() error {
 		if _, ok := queuesToKeep[qName]; !ok {
 			// It wasn't in the old list, evict it
 			delete(cfg.Queues.KnownQueues, qName)
-		} else {
 			queuesToRemove = append(queuesToRemove, qName)
 		}
 	}
@@ -342,7 +334,6 @@ func (cfg *Config) syncConfig() error {
 				if qName == queue {
 					_, err := cfg.Riak.Service.UpdateTopicSubscription(tName, qName, false)
 					if err != nil {
-						log.Println(err)
 						return err
 					}
 				}
