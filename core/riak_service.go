@@ -140,7 +140,7 @@ func (rs *RiakService) RangeScanMessages(queueName string, numMessages uint32, l
 		WithBucket(queueName).
 		WithIntRange(lowerBound, upperBound).
 		WithMaxResults(numMessages).
-		WithIndexName("$bucket").Build()
+		WithIndexName("id_int").Build()
 
 	if err != nil {
 		return nil, err
@@ -271,6 +271,8 @@ func (rs *RiakService) StoreMessage(queueName string, message string) (string, e
 		ContentEncoding: "utf-8",
 		Value:           []byte(message),
 	}
+
+	obj.AddToIntIndex("id_int", int(randID.Int64()))
 
 	cmd, err := riak.NewStoreValueCommandBuilder().
 		WithBucketType("messages").

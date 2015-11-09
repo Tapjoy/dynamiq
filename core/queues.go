@@ -31,7 +31,7 @@ var (
 	// Settings Arrays and maps cannot be made immutable in golang
 	Settings = [...]string{VisibilityTimeout, PartitionStep, CompressedMessages}
 	// DefaultSettings is
-	DefaultSettings = map[string]string{VisibilityTimeout: "5s", PartitionStep: "5000000", CompressedMessages: "false"}
+	DefaultSettings = map[string]string{VisibilityTimeout: "5s", PartitionStep: "922337203685477580", CompressedMessages: "false"}
 )
 
 // Queues represents a collection of Queue objects, and the behaviors that may be
@@ -204,11 +204,8 @@ func (queues *Queues) DeleteMessages(name string, ids []string) (map[string]bool
 func (queues *Queues) PollMessages(name string, batchSize uint32) (map[string]string, error) {
 	queues.configLock.RLock()
 	defer queues.configLock.RUnlock()
-	log.Println(queues.KnownQueues)
-	log.Println(queues.Config)
 	queue, ok := queues.KnownQueues[name]
 	if !ok {
-		log.Println("not found")
 		return nil, ErrUnknownQueue
 	}
 	lower, upper, err := queue.ring.ReserveNext()
