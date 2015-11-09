@@ -118,7 +118,6 @@ func (t *Topics) BroadcastMessage(topicName string, data string) ([]map[string]i
 	results := make([]map[string]interface{}, 0)
 	for _, q := range topic.Config.Sets["queues"] {
 		queueName := string(q)
-		log.Println("Queue is", queueName)
 		id, err := t.riakService.StoreMessage(queueName, data)
 		result := map[string]interface{}{"id": id, "queue": queueName}
 		if err != nil {

@@ -136,10 +136,8 @@ func (queues *Queues) Create(queueName string, options map[string]string) (bool,
 	cOp := &riak.MapOperation{}
 	for name, defaultValue := range DefaultSettings {
 		if val, ok := options[name]; ok {
-			log.Println("Found a setting for this", name, " ", val)
 			cOp.SetRegister(name, []byte(val))
 		} else {
-			log.Println("Found a default setting for this", name, " ", val)
 			cOp.SetRegister(name, []byte(defaultValue))
 		}
 		//cfgOps = append(cfgOps, cOp)

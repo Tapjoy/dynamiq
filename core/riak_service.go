@@ -327,7 +327,7 @@ func (rs *RiakService) DeleteMessages(queueName string, keys []string) (map[stri
 	// Seed it with the expected number of ops
 	wg.Add(len(keys))
 
-	results := make(map[string]bool, len(keys))
+	results := make(map[string]bool)
 
 	for _, mKey := range keys {
 		// Kick off a go routine to delete the message
@@ -335,7 +335,7 @@ func (rs *RiakService) DeleteMessages(queueName string, keys []string) (map[stri
 			defer w.Done()
 
 			deleted, err := riakService.DeleteMessage(queueName, messageKey)
-			if err != nil {
+			if err == nil {
 				// Pop the results onto the channel
 				c <- &deletedMessage{key: messageKey, deleted: deleted}
 			}

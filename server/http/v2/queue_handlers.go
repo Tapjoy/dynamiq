@@ -2,7 +2,6 @@ package httpv2
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -72,7 +71,6 @@ func (h *HTTPApi) queueGetMessage(w http.ResponseWriter, r *http.Request) {
 func (h *HTTPApi) queuePollMessage(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	queueName := vars["queue"]
-	log.Println(queueName)
 	count := vars["count"]
 
 	uCount, err := strconv.ParseUint(count, 10, 32)

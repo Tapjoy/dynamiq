@@ -3,7 +3,6 @@ package httpv2
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -49,7 +48,6 @@ func (h *HTTPApi) topicSubmitMessage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errorResponse(w, err)
 	}
-	log.Println(results)
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(results)
 }
